@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>眼軸長 成長曲線レポート</title>
+<style>
+:root{--ink:#1d2a36;--mute:#667585;--line:#d9e0e6;--bg:#eef2f6;--accent:#0b6bcb;--r:#1f5fbf;--l:#e07b00;--ok:#1b8a4b;--warn:#c0392b}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Yu Gothic UI","Yu Gothic",Meiryo,sans-serif;color:var(--ink);background:var(--bg);line-height:1.5}
+.app{display:grid;grid-template-columns:400px minmax(0,1fr);gap:16px;padding:16px;align-items:start}
+.panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
+.panel h2{font-size:15px;margin:0 0 10px}
+.panel h3{font-size:13px;margin:16px 0 6px;color:var(--mute)}
+label.f{display:block;font-size:12px;color:var(--mute);margin-bottom:8px}
+label.f input,label.f select{display:block;width:100%;margin-top:2px}
+input,select,button{font:inherit;font-size:14px}
+input,select{border:1px solid #c5ced6;border-radius:6px;padding:5px 7px;background:#fff;color:var(--ink)}
+button{border:1px solid #c5ced6;background:#fff;border-radius:6px;padding:6px 10px;cursor:pointer}
+button:hover{background:#f3f6f9}
+button.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+button.pri:hover{background:#0958a8}
+.seg{display:flex;gap:6px;margin-bottom:8px}
+.seg label{flex:1;text-align:center;border:1px solid #c5ced6;border-radius:6px;padding:6px;cursor:pointer;font-size:14px}
+.seg input{display:none}
+.seg label:has(input:checked){background:var(--accent);color:#fff;border-color:var(--accent)}
+table.ed{width:100%;border-collapse:collapse;font-size:13px}
+table.ed th{font-weight:500;color:var(--mute);font-size:11px;text-align:center;padding:2px}
+table.ed td{padding:2px;text-align:center}
+table.ed input[type=number]{width:100%;padding:4px 3px;text-align:center}
+table.ed td.x button{padding:2px 7px;color:#999}
+.btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.hint{font-size:11px;color:var(--mute);margin-top:6px}
+.sheetwrap{display:flex;justify-content:center}
+.sheet{background:#fff;width:210mm;max-width:100%;padding:11mm 12mm;box-shadow:0 2px 12px rgba(0,0,0,.12);border-radius:4px}
+body.present .app{grid-template-columns:1fr}
+body.present .panel{display:none}
+body.present .sheet{width:min(100%,1180px);padding:22px 30px}
+.present-bar{display:none;position:fixed;right:14px;bottom:14px;gap:6px}
+body.present .present-bar{display:flex}
+.sh-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--accent);padding-bottom:6px;margin-bottom:8px}
+.sh-head h1{font-size:20px;margin:0}
+.sh-head .cl{font-size:12px;color:var(--mute)}
+.info{display:flex;flex-wrap:wrap;gap:4px 22px;font-size:13px;margin-bottom:6px}
+.info b{font-size:15px}
+.chart svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:11.5px;color:var(--mute);margin:2px 0 8px}
+.legend i{display:inline-block;width:22px;height:0;border-top:2.5px solid;vertical-align:middle;margin-right:4px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+.card{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;break-inside:avoid}
+.card h4{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:6px}
+.dot{width:11px;height:11px;border-radius:50%;display:inline-block}
+.card .ln{margin:3px 0}
+.card .ln small{color:var(--mute)}
+.badge{display:inline-block;border-radius:10px;padding:0 8px;font-size:11.5px;color:#fff;margin-left:4px}
+.b-good{background:var(--ok)}.b-mid{background:#5b7a99}.b-bad{background:var(--warn)}
+.big{font-size:13.5px;font-weight:700;margin-top:4px}
+table.rs{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}
+table.rs th,table.rs td{border:1px solid var(--line);padding:3px 5px;text-align:center}
+table.rs th{background:#f3f6f9;font-weight:500}
+table.rs tr.start td{background:#fff6e0}
+.note{font-size:10.5px;color:var(--mute);line-height:1.5}
+.empty{color:var(--mute);font-size:12px}
+@media (max-width:980px){.app{grid-template-columns:1fr}.panel{position:static;max-height:none}.cards{grid-template-columns:1fr}}
+@media print{
+ @page{size:A4 portrait;margin:0}
+ html,body{background:#fff}
+ .panel,.present-bar{display:none!important}
+ .app{display:block;padding:0}
+ .sheetwrap{display:block}
+ .sheet,body.present .sheet{width:210mm;height:296mm;overflow:hidden;padding:11mm 12mm;box-shadow:none;border-radius:0;margin:0}
+ .cards{grid-template-columns:1fr 1fr!important}
+ *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div class="app">
+ <aside class="panel">
+  <h2>眼軸長 成長曲線レポート</h2>
+  <div class="seg">
+   <label><input type="radio" name="sex" value="m">男児</label>
+   <label><input type="radio" name="sex" value="f">女児</label>
+  </div>
+  <label class="f">患者さん名<input id="name" placeholder="例）山田 太郎"></label>
+  <label class="f">治療内容<input id="treat" placeholder="例）低濃度アトロピン点眼 / オルソケラトロジー"></label>
+  <label class="f">作成日<input id="date" type="date"></label>
+
+  <h3>測定データ（年齢は測定時）</h3>
+  <table class="ed">
+   <thead><tr><th>開始</th><th>歳</th><th>か月</th><th style="color:var(--r)">右 (mm)</th><th style="color:var(--l)">左 (mm)</th><th></th></tr></thead>
+   <tbody id="rows"></tbody>
+  </table>
+  <div class="btns">
+   <button id="add">＋ 測定を追加</button>
+   <button id="clearStart">治療開始を解除</button>
+  </div>
+  <div class="hint">「開始」の○＝その測定時点から治療開始。治療前後の年間伸長量を比較します。片眼だけの入力も可。</div>
+
+  <div class="btns" style="margin-top:16px">
+   <button class="pri" id="show">画面で見せる</button>
+   <button class="pri" id="print">A4で印刷</button>
+   <button id="sample">サンプル</button>
+   <button id="reset">全消去</button>
+  </div>
+ </aside>
+
+ <main class="sheetwrap">
+  <section class="sheet" id="sheet">
+   <div class="sh-head"><h1>眼軸長 経過レポート</h1><div class="cl" id="shDate"></div></div>
+   <div class="info" id="info"></div>
+   <div class="chart" id="chart"></div>
+   <div class="legend" id="legend"></div>
+   <div class="cards" id="cards"></div>
+   <div id="tbl"></div>
+   <div class="note">※ 背景の帯は日本人小児の眼軸長パーセンタイル成長曲線（10〜90パーセンタイル）です。「標準的な伸びの目安」は、治療開始時（なければ初回）の眼軸長から、標準（50パーセンタイル）と同じ速さで伸びた場合の線です。パーセンタイルは曲線からの推定値です。眼軸長には測定ごとに±0.05〜0.1mm程度の誤差があるため、半年以上の経過で判断します。治療効果の最終的な判定は診察で総合的に行います。</div>
+  </section>
+ </main>
+</div>
+<div class="present-bar"><button id="back">← 入力に戻る</button><button class="pri" id="print2">A4で印刷</button></div>
+
+<script>
+const REF={
+ m:{a:[6,8,10,12,15],p90:[23.8,24.8,25.8,26.6,27.1],p50:[22.9,23.7,24.5,25.1,25.6],p10:[22.1,22.8,23.4,23.9,24.3]},
+ f:{a:[6,8,10,12,15],p90:[23.3,24.2,25.2,25.9,26.4],p50:[22.4,23.2,24.0,24.6,24.9],p10:[21.7,22.3,22.9,23.4,23.7]}
+};
+function mono(xs,ys){
+ const n=xs.length,d=[],m=[];
+ for(let i=0;i<n-1;i++)d[i]=(ys[i+1]-ys[i])/(xs[i+1]-xs[i]);
+ m[0]=d[0];m[n-1]=d[n-2];
+ for(let i=1;i<n-1;i++)m[i]=d[i-1]*d[i]<=0?0:(d[i-1]+d[i])/2;
+ for(let i=0;i<n-1;i++){
+  if(d[i]===0){m[i]=m[i+1]=0;continue}
+  const a=m[i]/d[i],b=m[i+1]/d[i],s=a*a+b*b;
+  if(s>9){const t=3/Math.sqrt(s);m[i]=t*a*d[i];m[i+1]=t*b*d[i]}
+ }
+ return x=>{
+  x=Math.min(xs[n-1],Math.max(xs[0],x));
+  let i=0;while(i<n-2&&x>xs[i+1])i++;
+  const h=xs[i+1]-xs[i],t=(x-xs[i])/h,t2=t*t,t3=t2*t;
+  return (2*t3-3*t2+1)*ys[i]+(t3-2*t2+t)*h*m[i]+(-2*t3+3*t2)*ys[i+1]+(t3-t2)*h*m[i+1];
+ };
+}
+const FN={};
+for(const s of['m','f'])FN[s]={p90:mono(REF[s].a,REF[s].p90),p50:mono(REF[s].a,REF[s].p50),p10:mono(REF[s].a,REF[s].p10)};
+function cdf(z){
+ const t=1/(1+0.2316419*Math.abs(z)),d=0.3989423*Math.exp(-z*z/2);
+ const p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));
+ return z>0?1-p:p;
+}
+function pct(age,al){
+ if(age<5.9||age>15.1)return null;
+ const f=FN[S.sex],sd=(f.p90(age)-f.p10(age))/2.5631;
+ return Math.min(99,Math.max(1,Math.round(cdf((al-f.p50(age))/sd)*100)));
+}
+
+const KEY='ganjiku_v1';
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+let S;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.rows)S={sex:'m',name:'',treat:'',date:today(),startId:null,rows:[{id:1,y:8,m:0,r:'',l:''}],next:2};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ageText=a=>{const t=Math.round(a*12);return Math.floor(t/12)+'歳'+(t%12)+'か月'};
+const EYES=[{k:'r',name:'右眼',col:'#1f5fbf'},{k:'l',name:'左眼',col:'#e07b00'}];
+
+function points(k){
+ return S.rows.map(r=>({id:r.id,age:(+r.y)+(+r.m)/12,al:parseFloat(r[k])}))
+  .filter(p=>isFinite(p.age)&&isFinite(p.al)&&p.al>15&&p.al<35).sort((a,b)=>a.age-b.age);
+}
+
+/* ---------- editor ---------- */
+function renderEditor(){
+ S.rows.sort((a,b)=>((+a.y)*12+(+a.m))-((+b.y)*12+(+b.m)));
+ $('rows').innerHTML=S.rows.map(r=>`<tr data-id="${r.id}">
+  <td><input type="radio" name="start" ${S.startId===r.id?'checked':''}></td>
+  <td><input type="number" data-f="y" min="3" max="20" value="${r.y}"></td>
+  <td><input type="number" data-f="m" min="0" max="11" value="${r.m}"></td>
+  <td><input type="number" data-f="r" step="0.01" min="15" max="35" value="${r.r}"></td>
+  <td><input type="number" data-f="l" step="0.01" min="15" max="35" value="${r.l}"></td>
+  <td class="x"><button data-del title="削除">×</button></td></tr>`).join('');
+}
+$('rows').addEventListener('input',e=>{
+ const tr=e.target.closest('tr');if(!tr||!e.target.dataset.f)return;
+ const row=S.rows.find(r=>r.id==tr.dataset.id);row[e.target.dataset.f]=e.target.value;save();render();
+});
+$('rows').addEventListener('change',e=>{
+ if(e.target.name==='start'){S.startId=+e.target.closest('tr').dataset.id;save();render();return}
+ if(e.target.dataset.f==='y'||e.target.dataset.f==='m'){renderEditor();render()}
+});
+$('rows').addEventListener('click',e=>{
+ if(!e.target.hasAttribute('data-del'))return;
+ const id=+e.target.closest('tr').dataset.id;
+ S.rows=S.rows.filter(r=>r.id!==id);if(S.startId===id)S.startId=null;
+ if(!S.rows.length)S.rows.push({id:S.next++,y:8,m:0,r:'',l:''});
+ save();renderEditor();render();
+});
+$('add').onclick=()=>{
+ const last=S.rows[S.rows.length-1];let t=last?(+last.y)*12+(+last.m)+6:96;
+ S.rows.push({id:S.next++,y:Math.floor(t/12),m:t%12,r:'',l:''});save();renderEditor();render();
+};
+$('clearStart').onclick=()=>{S.startId=null;save();renderEditor();render()};
+document.querySelectorAll('input[name=sex]').forEach(el=>el.onchange=()=>{S.sex=el.value;save();render()});
+for(const id of['name','treat','date'])$(id).oninput=()=>{S[id]=$(id).value;save();render()};
+$('sample').onclick=()=>{
+ S.sex='m';S.name='サンプル 太郎';S.treat='低濃度アトロピン点眼';S.date=today();S.next=20;S.startId=3;
+ S.rows=[[1,8,0,23.55,23.50],[2,8,6,23.85,23.80],[3,9,0,24.10,24.02],[4,9,6,24.22,24.16],[5,10,0,24.33,24.27],[6,10,6,24.44,24.38],[7,11,0,24.55,24.47]]
+  .map(a=>({id:a[0],y:a[1],m:a[2],r:String(a[3]),l:String(a[4])}));
+ save();syncFields();renderEditor();render();
+};
+$('reset').onclick=()=>{
+ if(!confirm('入力内容をすべて消去しますか？'))return;
+ S={sex:S.sex,name:'',treat:'',date:today(),startId:null,rows:[{id:1,y:8,m:0,r:'',l:''}],next:2};
+ save();syncFields();renderEditor();render();
+};
+function syncFields(){
+ document.querySelector('input[name=sex][value='+S.sex+']').checked=true;
+ $('name').value=S.name;$('treat').value=S.treat;$('date').value=S.date;
+}
+const setPresent=on=>{document.body.classList.toggle('present',on);window.scrollTo(0,0)};
+$('show').onclick=()=>setPresent(true);
+$('back').onclick=()=>setPresent(false);
+$('print').onclick=$('print2').onclick=()=>window.print();
+
+/* ---------- chart ---------- */
+function drawChart(){
+ const f=FN[S.sex],all=EYES.flatMap(e=>points(e.k));
+ const ages=all.map(p=>p.age),als=all.map(p=>p.al);
+ const lo=Math.min(6,Math.floor(Math.min(...ages,6))),hi=Math.max(15,Math.ceil(Math.max(...ages,15)));
+ const ylo=Math.floor(Math.min(f.p10(6),...als)-0.2),yhi=Math.ceil(Math.max(f.p90(15),...als)+0.2);
+ const W=700,H=470,ml=48,mr=44,mt=26,mb=42,pw=W-ml-mr,ph=H-mt-mb;
+ const X=a=>ml+(a-lo)/(hi-lo)*pw,Y=v=>mt+(1-(v-ylo)/(yhi-ylo))*ph;
+ const path=g=>{let s='';for(let a=6;a<=15.0001;a+=0.1)s+=(s?'L':'M')+X(a).toFixed(1)+' '+Y(g(a)).toFixed(1);return s};
+ let o=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Yu Gothic UI,Yu Gothic,Meiryo,sans-serif">`;
+ o+=`<rect x="${ml}" y="${mt}" width="${pw}" height="${ph}" fill="#fff" stroke="#8b97a3"/>`;
+ for(let v=ylo;v<=yhi;v+=0.5){
+  const major=Number.isInteger(v);
+  o+=`<line x1="${ml}" x2="${ml+pw}" y1="${Y(v)}" y2="${Y(v)}" stroke="${major?'#d5dbe1':'#eef1f4'}" stroke-dasharray="${major?'4 3':'2 3'}"/>`;
+  if(major)o+=`<text x="${ml-6}" y="${Y(v)+4}" font-size="13" text-anchor="end" fill="#445">${v}</text>`;
+ }
+ for(let a=lo;a<=hi;a++){
+  o+=`<line x1="${X(a)}" x2="${X(a)}" y1="${mt}" y2="${mt+ph}" stroke="#e3e8ec" stroke-dasharray="4 3"/>`;
+  o+=`<text x="${X(a)}" y="${mt+ph+17}" font-size="13" text-anchor="middle" fill="#445">${a}</text>`;
+ }
+ o+=`<text x="${ml+pw/2}" y="${H-6}" font-size="13" text-anchor="middle" fill="#445">年齢（歳）</text>`;
+ o+=`<text transform="translate(13 ${mt+ph/2}) rotate(-90)" font-size="13" text-anchor="middle" fill="#445">眼軸長（mm）</text>`;
+ // band
+ let band=path(f.p90);
+ for(let a=15;a>=5.9999;a-=0.1)band+='L'+X(a).toFixed(1)+' '+Y(f.p10(a)).toFixed(1);
+ o+=`<path d="${band}Z" fill="${S.sex==='m'?'#e8f1fb':'#fdeaf3'}"/>`;
+ if(24>=ylo&&24<=yhi)o+=`<line x1="${ml}" x2="${ml+pw}" y1="${Y(24)}" y2="${Y(24)}" stroke="#9aa3ab" stroke-width="1.4" stroke-dasharray="8 3 2 3"/>`;
+ o+=`<path d="${path(f.p90)}" fill="none" stroke="#d9615a" stroke-width="1.6" stroke-dasharray="6 4"/>`;
+ o+=`<path d="${path(f.p10)}" fill="none" stroke="#4fae5a" stroke-width="1.8" stroke-dasharray="2 3"/>`;
+ o+=`<path d="${path(f.p50)}" fill="none" stroke="${S.sex==='m'?'#5b8fd0':'#e07aa8'}" stroke-width="2.4"/>`;
+ for(const [lab,g,c] of [['90%',f.p90,'#d9615a'],['50%',f.p50,'#445'],['10%',f.p10,'#4fae5a']])
+  o+=`<text x="${X(15)+5}" y="${Y(g(15))+4}" font-size="11.5" fill="${c}">${lab}</text>`;
+ // treatment start
+ const sr=S.rows.find(r=>r.id===S.startId);
+ if(sr){
+  const sa=(+sr.y)+(+sr.m)/12;
+  if(sa>=lo&&sa<=hi){
+   o+=`<line x1="${X(sa)}" x2="${X(sa)}" y1="${mt}" y2="${mt+ph}" stroke="#e0a000" stroke-width="1.6" stroke-dasharray="5 3"/>`;
+   o+=`<text x="${X(sa)}" y="${mt-8}" font-size="12.5" font-weight="700" text-anchor="middle" fill="#b57f00">▼ 治療開始</text>`;
+  }
+ }
+ // patient
+ for(const e of EYES){
+  const pts=points(e.k);if(!pts.length)continue;
+  const st=pts.find(p=>p.id===S.startId)||pts[0];
+  const last=pts[pts.length-1];
+  if(last.age>st.age){
+   let d='';for(let a=st.age;a<last.age+0.0001;a+=0.1){const aa=Math.min(a,last.age);d+=(d?'L':'M')+X(aa).toFixed(1)+' '+Y(st.al+f.p50(aa)-f.p50(st.age)).toFixed(1)}
+   o+=`<path d="${d}" fill="none" stroke="${e.col}" stroke-opacity=".55" stroke-width="2" stroke-dasharray="3 4"/>`;
+  }
+ }
+ for(const e of EYES){
+  const pts=points(e.k);if(!pts.length)continue;
+  if(pts.length>1)o+=`<path d="${pts.map((p,i)=>(i?'L':'M')+X(p.age).toFixed(1)+' '+Y(p.al).toFixed(1)).join('')}" fill="none" stroke="${e.col}" stroke-width="3" stroke-linejoin="round"/>`;
+  for(const p of pts){
+   const x=X(p.age),y=Y(p.al);
+   o+=e.k==='r'?`<circle cx="${x}" cy="${y}" r="5.2" fill="${e.col}" stroke="#fff" stroke-width="1.5"/>`
+    :`<rect x="${x-4.7}" y="${y-4.7}" width="9.4" height="9.4" fill="${e.col}" stroke="#fff" stroke-width="1.5"/>`;
+  }
+  const lp=pts[pts.length-1];
+  o+=`<text x="${X(lp.age)}" y="${Y(lp.al)+(e.k==='r'?-11:18)}" font-size="12.5" font-weight="700" text-anchor="middle" fill="${e.col}">${lp.al.toFixed(2)}</text>`;
+ }
+ if(!all.length)o+=`<text x="${ml+pw/2}" y="${mt+ph/2}" font-size="15" text-anchor="middle" fill="#99a">眼軸長を入力するとここに表示されます</text>`;
+ return o+'</svg>';
+}
+
+/* ---------- summary ---------- */
+function seg(a,b){
+ const dt=b.age-a.age,d=b.al-a.al,f=FN[S.sex];
+ return{dt,d,rate:d/dt,std:(f.p50(b.age)-f.p50(a.age))/dt};
+}
+function verdict(s){
+ if(s.std<0.08)return'';
+ const q=s.rate/s.std;
+ if(q<=0.5)return'<span class="badge b-good">標準の半分以下</span>';
+ if(q<=0.85)return'<span class="badge b-good">標準より緩やか</span>';
+ if(q<=1.15)return'<span class="badge b-mid">標準と同程度</span>';
+ return'<span class="badge b-bad">標準より速い</span>';
+}
+function line(label,s){
+ const sign=s.d>=0?'+':'';
+ return`<div class="ln"><b>${label}</b> <small>${sign}${s.d.toFixed(2)}mm／${s.dt.toFixed(1)}年</small><br>年間 <b>${s.rate.toFixed(2)}</b> mm<small>（標準 ${s.std.toFixed(2)}）</small>${verdict(s)}${s.dt<0.5?' <small>※期間が短く参考値</small>':''}</div>`;
+}
+function eyeCard(e){
+ const pts=points(e.k);
+ let h=`<div class="card"><h4><span class="dot" style="background:${e.col}"></span>${e.name}</h4>`;
+ if(pts.length<2){return h+`<div class="empty">2回以上の測定で表示されます</div></div>`}
+ const first=pts[0],last=pts[pts.length-1],si=pts.findIndex(p=>p.id===S.startId);
+ if(si>0&&si<pts.length-1){
+  const b=seg(first,pts[si]),a=seg(pts[si],last);
+  h+=line('治療前',b)+line('治療後',a);
+  if(b.rate>0.05){
+   const red=(1-a.rate/b.rate)*100;
+   h+=`<div class="big" style="color:${red>=0?'var(--ok)':'var(--warn)'}">年間伸長量 ${b.rate.toFixed(2)} → ${a.rate.toFixed(2)} mm（${red>=0?Math.round(red)+'% 減少':Math.round(-red)+'% 増加'}）</div>`;
+  }
+ }else{
+  h+=line('全期間',seg(first,last));
+  if(si===0)h+=`<div class="empty">治療開始より前の測定がないため、治療前後の比較はできません</div>`;
+ }
+ const exp=last.al-(first.al+FN[S.sex].p50(last.age)-FN[S.sex].p50(first.age));
+ if(si<=0&&pts.length>1)h+=`<div class="ln"><small>標準的な伸びの目安との差：${exp>=0?'+':''}${exp.toFixed(2)}mm</small></div>`;
+ else{
+  const st=pts[si],ex=last.al-(st.al+FN[S.sex].p50(last.age)-FN[S.sex].p50(st.age));
+  h+=`<div class="ln"><small>治療開始後、標準的な伸びの目安との差：<b>${ex>=0?'+':''}${ex.toFixed(2)}mm</b>（マイナスは目安より短い）</small></div>`;
+ }
+ return h+'</div>';
+}
+function tableHtml(){
+ if(!S.rows.some(r=>isFinite(parseFloat(r.r))||isFinite(parseFloat(r.l))))return'';
+ const P={r:points('r'),l:points('l')};
+ const rows=S.rows.filter(r=>P.r.some(p=>p.id===r.id)||P.l.some(p=>p.id===r.id));
+ const cell=(k,r)=>{
+  const ps=P[k],i=ps.findIndex(p=>p.id===r.id);
+  if(i<0)return'<td>—</td><td>—</td><td>—</td>';
+  const p=ps[i],pc=pct(p.age,p.al),dl=i?p.al-ps[i-1].al:null;
+  return`<td><b>${p.al.toFixed(2)}</b></td><td>${pc==null?'—':'約'+pc}</td><td>${dl==null?'—':(dl>=0?'+':'')+dl.toFixed(2)}</td>`;
+ };
+ return`<table class="rs"><thead><tr><th rowspan="2">測定時の年齢</th><th colspan="3" style="color:var(--r)">右眼</th><th colspan="3" style="color:var(--l)">左眼</th></tr>
+ <tr><th>眼軸長(mm)</th><th>%tile</th><th>前回差</th><th>眼軸長(mm)</th><th>%tile</th><th>前回差</th></tr></thead><tbody>`+
+ rows.map(r=>`<tr class="${r.id===S.startId?'start':''}"><td>${ageText((+r.y)+(+r.m)/12)}${r.id===S.startId?' <span class="badge" style="background:#e0a000">治療開始</span>':''}</td>${cell('r',r)}${cell('l',r)}</tr>`).join('')+'</tbody></table>';
+}
+function render(){
+ const sexName=S.sex==='m'?'男児':'女児';
+ $('shDate').textContent=S.date?S.date.replace(/-/g,'/')+' 作成':'';
+ $('info').innerHTML=`<span>お名前：<b>${S.name?esc(S.name)+' さん':'　　　　　'}</b></span><span>性別：${sexName}</span>${S.treat?`<span>治療：${esc(S.treat)}</span>`:''}`;
+ $('chart').innerHTML=drawChart();
+ $('legend').innerHTML=`<span><i style="border-color:#1f5fbf"></i>右眼（●）</span><span><i style="border-color:#e07b00"></i>左眼（■）</span>
+  <span><i style="border-top-style:dotted;border-color:#888"></i>標準的な伸びの目安</span>
+  <span><i style="border-color:#d9615a;border-top-style:dashed;border-top-width:1.6px"></i>90%</span><span><i style="border-color:#5b8fd0"></i>50%（中央値）</span><span><i style="border-color:#4fae5a;border-top-style:dotted"></i>10%</span><span>一点鎖線＝24.0mm（成人の正視の目安）</span>`;
+ $('cards').innerHTML=EYES.map(eyeCard).join('');
+ $('tbl').innerHTML=tableHtml();
+}
+syncFields();renderEditor();render();
+</script>
+</body>
+</html>
