@@ -24,10 +24,15 @@ button.pri:hover{background:#0958a8}
 .seg label{flex:1;text-align:center;border:1px solid #c5ced6;border-radius:6px;padding:6px;cursor:pointer;font-size:14px}
 .seg input{display:none}
 .seg label:has(input:checked){background:var(--accent);color:#fff;border-color:var(--accent)}
+.idrow{display:flex;gap:6px}
+.idrow input{flex:1;min-width:0;font-size:16px}
+.status{font-size:12px;margin:6px 0 10px;color:var(--mute)}
+.status.ok{color:var(--ok)}.status.err{color:var(--warn)}
 table.ed{width:100%;border-collapse:collapse;font-size:13px}
 table.ed th{font-weight:500;color:var(--mute);font-size:11px;text-align:center;padding:2px}
-table.ed td{padding:2px;text-align:center}
-table.ed input[type=number]{width:100%;padding:4px 3px;text-align:center}
+table.ed td{padding:2px;text-align:center;vertical-align:top}
+table.ed input[type=number],table.ed input[type=month]{width:100%;padding:4px 3px;text-align:center}
+table.ed .ag{font-size:11px;color:var(--mute);margin-top:1px}
 table.ed td.x button{padding:2px 7px;color:#999}
 .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .hint{font-size:11px;color:var(--mute);margin-top:6px}
@@ -78,30 +83,38 @@ table.rs tr.start td{background:#fff6e0}
 <div class="app">
  <aside class="panel">
   <h2>眼軸長 成長曲線レポート</h2>
+
+  <div class="idrow">
+   <input id="pid" inputmode="latin" autocomplete="off" placeholder="ID（カルテ番号）">
+   <button class="pri" id="load">呼び出し</button>
+  </div>
+  <div class="status" id="status">IDを入力して「呼び出し」を押してください（新しいIDなら新規登録になります）</div>
+
+  <label class="f">患者さん名<input id="name" placeholder="例）山田 太郎"></label>
+  <label class="f">生年月日<input id="birth" type="date"></label>
   <div class="seg">
    <label><input type="radio" name="sex" value="m">男児</label>
    <label><input type="radio" name="sex" value="f">女児</label>
   </div>
-  <label class="f">患者さん名<input id="name" placeholder="例）山田 太郎"></label>
   <label class="f">治療内容<input id="treat" placeholder="例）低濃度アトロピン点眼 / オルソケラトロジー"></label>
-  <label class="f">作成日<input id="date" type="date"></label>
+  <label class="f">レポート作成日（保存されません）<input id="date" type="date"></label>
 
-  <h3>測定データ（年齢は測定時）</h3>
+  <h3>測定データ（測定した年月を入れると年齢は自動計算）</h3>
   <table class="ed">
-   <thead><tr><th>開始</th><th>歳</th><th>か月</th><th style="color:var(--r)">右 (mm)</th><th style="color:var(--l)">左 (mm)</th><th></th></tr></thead>
+   <thead><tr><th>開始</th><th>測定年月</th><th style="color:var(--r)">右 (mm)</th><th style="color:var(--l)">左 (mm)</th><th></th></tr></thead>
    <tbody id="rows"></tbody>
   </table>
   <div class="btns">
    <button id="add">＋ 測定を追加</button>
    <button id="clearStart">治療開始を解除</button>
   </div>
-  <div class="hint">「開始」の○＝その測定時点から治療開始。治療前後の年間伸長量を比較します。片眼だけの入力も可。</div>
+  <div class="hint">「開始」の○＝その測定から治療開始。入力内容はIDを呼び出し済みなら自動で保存されます。年齢は誕生月からの経過月数で計算します。</div>
 
   <div class="btns" style="margin-top:16px">
    <button class="pri" id="show">画面で見せる</button>
    <button class="pri" id="print">A4で印刷</button>
    <button id="sample">サンプル</button>
-   <button id="reset">全消去</button>
+   <button id="reset">新規／クリア</button>
   </div>
  </aside>
 
@@ -154,69 +167,152 @@ function pct(age,al){
  return Math.min(99,Math.max(1,Math.round(cdf((al-f.p50(age))/sd)*100)));
 }
 
-const KEY='ganjiku_v1';
+/* ---------- state ---------- */
+const KEY='ganjiku_v2',KEYPASS='ganjiku_pass';
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const blank=()=>({sex:'m',name:'',birth:'',treat:'',date:today(),startId:null,rows:[{id:1,ym:'',r:'',l:''}],next:2,pid:'',rev:0});
 let S;
-try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
-if(!S||!S.rows)S={sex:'m',name:'',treat:'',date:today(),startId:null,rows:[{id:1,y:8,m:0,r:'',l:''}],next:2};
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+try{S=Object.assign(blank(),JSON.parse(localStorage.getItem(KEY)))}catch(e){S=blank()}
+S.date=today();
+const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const getPass=()=>{try{return localStorage.getItem(KEYPASS)||''}catch(e){return''}};
+const setPass=v=>{try{localStorage.setItem(KEYPASS,v)}catch(e){}};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const ageText=a=>{const t=Math.round(a*12);return Math.floor(t/12)+'歳'+(t%12)+'か月'};
+const normId=s=>String(s||'').normalize('NFKC').trim();
+const validId=s=>/^[A-Za-z0-9_-]{1,32}$/.test(s);
 const EYES=[{k:'r',name:'右眼',col:'#1f5fbf'},{k:'l',name:'左眼',col:'#e07b00'}];
 
+/* ---------- age from birth + measurement month ---------- */
+const ymIdx=ym=>{const m=/^(\d{4})-(\d{2})$/.exec(ym||'');return m?(+m[1])*12+(+m[2])-1:NaN};
+const birthIdx=()=>{const b=/^(\d{4})-(\d{2})-\d{2}$/.exec(S.birth||'');return b?(+b[1])*12+(+b[2])-1:NaN};
+const rowAge=r=>(ymIdx(r.ym)-birthIdx())/12;
+const ageText=a=>{const t=Math.round(a*12);return Math.floor(t/12)+'歳'+(t%12)+'か月'};
+const ageLabel=r=>{const a=rowAge(r);return isFinite(a)&&a>0?ageText(a):(S.birth?'':'生年月日を入力')};
 function points(k){
- return S.rows.map(r=>({id:r.id,age:(+r.y)+(+r.m)/12,al:parseFloat(r[k])}))
-  .filter(p=>isFinite(p.age)&&isFinite(p.al)&&p.al>15&&p.al<35).sort((a,b)=>a.age-b.age);
+ return S.rows.map(r=>({id:r.id,age:rowAge(r),al:parseFloat(r[k])}))
+  .filter(p=>isFinite(p.age)&&p.age>0&&isFinite(p.al)&&p.al>15&&p.al<35).sort((a,b)=>a.age-b.age);
 }
+const shiftYm=(ym,n)=>{let t=ymIdx(ym);if(!isFinite(t)){const d=new Date();t=d.getFullYear()*12+d.getMonth()-n}t+=n;return Math.floor(t/12)+'-'+String(t%12+1).padStart(2,'0')};
+
+/* ---------- server save / load ---------- */
+let saveTimer=null,saving=false,dirty=false,halted=false;
+function setStatus(t,cls){const e=$('status');e.textContent=t;e.className='status'+(cls?' '+cls:'')}
+async function api(method,payload){
+ for(let attempt=0;attempt<2;attempt++){
+  let key=getPass();
+  if(!key){key=(prompt('パスコードを入力してください（この端末では初回のみ）')||'').trim();if(!key)throw new Error('パスコードが未入力です');setPass(key)}
+  const url=method==='GET'?'/api/patient?id='+encodeURIComponent(payload):'/api/patient';
+  const res=await fetch(url,{method,headers:{'x-access-key':key,'Content-Type':'application/json'},body:method==='GET'?undefined:JSON.stringify(payload)});
+  if(res.status===401){setPass('');if(attempt===0){alert('パスコードが違います。もう一度入力してください');continue}throw new Error('パスコードが違います')}
+  if(res.status===404)return null;
+  const j=await res.json().catch(()=>({}));
+  if(res.status===409){const e=new Error('conflict');e.conflict=true;throw e}
+  if(!res.ok)throw new Error(j.error||('通信エラー '+res.status));
+  return j;
+ }
+}
+const record=()=>({sex:S.sex,name:S.name,birth:S.birth,treat:S.treat,startId:S.startId,rows:S.rows,next:S.next});
+function markDirty(){
+ if(!S.pid){setStatus('IDを入力して「呼び出し」を押すと、以後の入力が自動保存されます');return}
+ if(halted)return;
+ dirty=true;setStatus('入力中…（自動保存します）');
+ clearTimeout(saveTimer);saveTimer=setTimeout(saveNow,900);
+}
+async function saveNow(){
+ clearTimeout(saveTimer);
+ if(!S.pid||halted)return;
+ if(saving){dirty=true;return}
+ saving=true;dirty=false;setStatus('保存中…');
+ let failed=false;
+ try{
+  const r=await api('PUT',{id:S.pid,baseRev:S.rev,record:record()});
+  S.rev=r.rev;persist();
+  setStatus('✓ ID '+S.pid+' を保存しました（'+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'）','ok');
+ }catch(e){
+  failed=true;
+  if(e.conflict){halted=true;setStatus('⚠ 別の端末で更新されています。「呼び出し」で最新を読み込んでください（この端末の変更は保存されていません）','err')}
+  else setStatus('⚠ 保存できませんでした：'+e.message,'err');
+ }
+ saving=false;
+ if(dirty&&!failed)saveNow();
+}
+async function flush(){if(dirty&&S.pid&&!halted)await saveNow()}
+async function loadPatient(){
+ const id=normId($('pid').value);
+ if(!validId(id)){setStatus('IDは英数字（-と_も可）32文字以内で入力してください','err');return}
+ await flush();
+ setStatus('呼び出し中…');
+ try{
+  const r=await api('GET',id);
+  halted=false;dirty=false;
+  if(!r){
+   S=Object.assign(blank(),{pid:id,rev:0});
+   setStatus('ID '+id+' は新規です。入力すると自動保存されます');
+  }else{
+   S=Object.assign(blank(),r.record,{pid:id,date:today()});
+   setStatus('✓ ID '+id+' を呼び出しました。変更すると自動保存されます','ok');
+  }
+  $('pid').value=id;persist();syncFields();renderEditor();render();
+ }catch(e){setStatus('⚠ 呼び出せませんでした：'+e.message,'err')}
+}
+$('load').onclick=loadPatient;
+$('pid').addEventListener('keydown',e=>{if(e.key==='Enter')loadPatient()});
 
 /* ---------- editor ---------- */
+const changed=()=>{persist();render();markDirty()};
 function renderEditor(){
- S.rows.sort((a,b)=>((+a.y)*12+(+a.m))-((+b.y)*12+(+b.m)));
+ S.rows.sort((a,b)=>(ymIdx(a.ym)||1e9)-(ymIdx(b.ym)||1e9));
  $('rows').innerHTML=S.rows.map(r=>`<tr data-id="${r.id}">
-  <td><input type="radio" name="start" ${S.startId===r.id?'checked':''}></td>
-  <td><input type="number" data-f="y" min="3" max="20" value="${r.y}"></td>
-  <td><input type="number" data-f="m" min="0" max="11" value="${r.m}"></td>
-  <td><input type="number" data-f="r" step="0.01" min="15" max="35" value="${r.r}"></td>
-  <td><input type="number" data-f="l" step="0.01" min="15" max="35" value="${r.l}"></td>
-  <td class="x"><button data-del title="削除">×</button></td></tr>`).join('');
+  <td style="width:30px"><input type="radio" name="start" ${S.startId===r.id?'checked':''}></td>
+  <td style="width:140px"><input type="month" data-f="ym" value="${esc(r.ym)}"><div class="ag">${esc(ageLabel(r))}</div></td>
+  <td><input type="number" data-f="r" step="0.01" min="15" max="35" value="${esc(r.r)}"></td>
+  <td><input type="number" data-f="l" step="0.01" min="15" max="35" value="${esc(r.l)}"></td>
+  <td class="x" style="width:26px"><button data-del title="削除">×</button></td></tr>`).join('');
 }
 $('rows').addEventListener('input',e=>{
  const tr=e.target.closest('tr');if(!tr||!e.target.dataset.f)return;
- const row=S.rows.find(r=>r.id==tr.dataset.id);row[e.target.dataset.f]=e.target.value;save();render();
+ const row=S.rows.find(r=>r.id==tr.dataset.id);row[e.target.dataset.f]=e.target.value;
+ if(e.target.dataset.f==='ym')tr.querySelector('.ag').textContent=ageLabel(row);
+ changed();
 });
 $('rows').addEventListener('change',e=>{
- if(e.target.name==='start'){S.startId=+e.target.closest('tr').dataset.id;save();render();return}
- if(e.target.dataset.f==='y'||e.target.dataset.f==='m'){renderEditor();render()}
+ if(e.target.name==='start'){S.startId=+e.target.closest('tr').dataset.id;changed();return}
+ if(e.target.dataset.f==='ym')renderEditor();
 });
 $('rows').addEventListener('click',e=>{
  if(!e.target.hasAttribute('data-del'))return;
  const id=+e.target.closest('tr').dataset.id;
  S.rows=S.rows.filter(r=>r.id!==id);if(S.startId===id)S.startId=null;
- if(!S.rows.length)S.rows.push({id:S.next++,y:8,m:0,r:'',l:''});
- save();renderEditor();render();
+ if(!S.rows.length)S.rows.push({id:S.next++,ym:'',r:'',l:''});
+ renderEditor();changed();
 });
 $('add').onclick=()=>{
- const last=S.rows[S.rows.length-1];let t=last?(+last.y)*12+(+last.m)+6:96;
- S.rows.push({id:S.next++,y:Math.floor(t/12),m:t%12,r:'',l:''});save();renderEditor();render();
+ const last=S.rows[S.rows.length-1];
+ S.rows.push({id:S.next++,ym:last&&last.ym?shiftYm(last.ym,6):'',r:'',l:''});
+ renderEditor();changed();
 };
-$('clearStart').onclick=()=>{S.startId=null;save();renderEditor();render()};
-document.querySelectorAll('input[name=sex]').forEach(el=>el.onchange=()=>{S.sex=el.value;save();render()});
-for(const id of['name','treat','date'])$(id).oninput=()=>{S[id]=$(id).value;save();render()};
-$('sample').onclick=()=>{
- S.sex='m';S.name='サンプル 太郎';S.treat='低濃度アトロピン点眼';S.date=today();S.next=20;S.startId=3;
- S.rows=[[1,8,0,23.55,23.50],[2,8,6,23.85,23.80],[3,9,0,24.10,24.02],[4,9,6,24.22,24.16],[5,10,0,24.33,24.27],[6,10,6,24.44,24.38],[7,11,0,24.55,24.47]]
-  .map(a=>({id:a[0],y:a[1],m:a[2],r:String(a[3]),l:String(a[4])}));
- save();syncFields();renderEditor();render();
+$('clearStart').onclick=()=>{S.startId=null;renderEditor();changed()};
+document.querySelectorAll('input[name=sex]').forEach(el=>el.onchange=()=>{S.sex=el.value;changed()});
+for(const id of['name','treat','date'])$(id).oninput=()=>{S[id]=$(id).value;changed()};
+$('birth').oninput=()=>{S.birth=$('birth').value;renderEditor();changed()};
+$('sample').onclick=async()=>{
+ await flush();
+ S=Object.assign(blank(),{sex:'m',name:'サンプル 太郎',birth:'2014-04-10',treat:'低濃度アトロピン点眼',startId:3,next:20,
+  rows:[[1,'2022-04',23.55,23.50],[2,'2022-10',23.85,23.80],[3,'2023-04',24.10,24.02],[4,'2023-10',24.22,24.16],[5,'2024-04',24.33,24.27],[6,'2024-10',24.44,24.38],[7,'2025-04',24.55,24.47]]
+   .map(a=>({id:a[0],ym:a[1],r:String(a[2]),l:String(a[3])}))});
+ halted=false;dirty=false;persist();syncFields();renderEditor();render();
+ setStatus('サンプル表示中（保存されません）');
 };
-$('reset').onclick=()=>{
- if(!confirm('入力内容をすべて消去しますか？'))return;
- S={sex:S.sex,name:'',treat:'',date:today(),startId:null,rows:[{id:1,y:8,m:0,r:'',l:''}],next:2};
- save();syncFields();renderEditor();render();
+$('reset').onclick=async()=>{
+ if(!confirm('画面の入力をクリアして新しい患者さんの入力にします。\n（保存済みのデータは消えません）'))return;
+ await flush();
+ S=blank();halted=false;dirty=false;persist();syncFields();renderEditor();render();
+ setStatus('IDを入力して「呼び出し」を押してください（新しいIDなら新規登録になります）');
 };
 function syncFields(){
  document.querySelector('input[name=sex][value='+S.sex+']').checked=true;
- $('name').value=S.name;$('treat').value=S.treat;$('date').value=S.date;
+ $('pid').value=S.pid;$('name').value=S.name;$('birth').value=S.birth;$('treat').value=S.treat;$('date').value=S.date;
 }
 const setPresent=on=>{document.body.classList.toggle('present',on);window.scrollTo(0,0)};
 $('show').onclick=()=>setPresent(true);
@@ -245,7 +341,6 @@ function drawChart(){
  }
  o+=`<text x="${ml+pw/2}" y="${H-6}" font-size="13" text-anchor="middle" fill="#445">年齢（歳）</text>`;
  o+=`<text transform="translate(13 ${mt+ph/2}) rotate(-90)" font-size="13" text-anchor="middle" fill="#445">眼軸長（mm）</text>`;
- // band
  let band=path(f.p90);
  for(let a=15;a>=5.9999;a-=0.1)band+='L'+X(a).toFixed(1)+' '+Y(f.p10(a)).toFixed(1);
  o+=`<path d="${band}Z" fill="${S.sex==='m'?'#e8f1fb':'#fdeaf3'}"/>`;
@@ -255,16 +350,14 @@ function drawChart(){
  o+=`<path d="${path(f.p50)}" fill="none" stroke="${S.sex==='m'?'#5b8fd0':'#e07aa8'}" stroke-width="2.4"/>`;
  for(const [lab,g,c] of [['90%',f.p90,'#d9615a'],['50%',f.p50,'#445'],['10%',f.p10,'#4fae5a']])
   o+=`<text x="${X(15)+5}" y="${Y(g(15))+4}" font-size="11.5" fill="${c}">${lab}</text>`;
- // treatment start
  const sr=S.rows.find(r=>r.id===S.startId);
  if(sr){
-  const sa=(+sr.y)+(+sr.m)/12;
-  if(sa>=lo&&sa<=hi){
+  const sa=rowAge(sr);
+  if(isFinite(sa)&&sa>=lo&&sa<=hi){
    o+=`<line x1="${X(sa)}" x2="${X(sa)}" y1="${mt}" y2="${mt+ph}" stroke="#e0a000" stroke-width="1.6" stroke-dasharray="5 3"/>`;
    o+=`<text x="${X(sa)}" y="${mt-8}" font-size="12.5" font-weight="700" text-anchor="middle" fill="#b57f00">▼ 治療開始</text>`;
   }
  }
- // patient
  for(const e of EYES){
   const pts=points(e.k);if(!pts.length)continue;
   const st=pts.find(p=>p.id===S.startId)||pts[0];
@@ -285,7 +378,7 @@ function drawChart(){
   const lp=pts[pts.length-1];
   o+=`<text x="${X(lp.age)}" y="${Y(lp.al)+(e.k==='r'?-11:18)}" font-size="12.5" font-weight="700" text-anchor="middle" fill="${e.col}">${lp.al.toFixed(2)}</text>`;
  }
- if(!all.length)o+=`<text x="${ml+pw/2}" y="${mt+ph/2}" font-size="15" text-anchor="middle" fill="#99a">眼軸長を入力するとここに表示されます</text>`;
+ if(!all.length)o+=`<text x="${ml+pw/2}" y="${mt+ph/2}" font-size="15" text-anchor="middle" fill="#99a">${S.birth?'測定年月と眼軸長を入力するとここに表示されます':'生年月日と測定データを入力してください'}</text>`;
  return o+'</svg>';
 }
 
@@ -322,18 +415,19 @@ function eyeCard(e){
   h+=line('全期間',seg(first,last));
   if(si===0)h+=`<div class="empty">治療開始より前の測定がないため、治療前後の比較はできません</div>`;
  }
- const exp=last.al-(first.al+FN[S.sex].p50(last.age)-FN[S.sex].p50(first.age));
- if(si<=0&&pts.length>1)h+=`<div class="ln"><small>標準的な伸びの目安との差：${exp>=0?'+':''}${exp.toFixed(2)}mm</small></div>`;
- else{
+ if(si<=0&&pts.length>1){
+  const exp=last.al-(first.al+FN[S.sex].p50(last.age)-FN[S.sex].p50(first.age));
+  h+=`<div class="ln"><small>標準的な伸びの目安との差：${exp>=0?'+':''}${exp.toFixed(2)}mm</small></div>`;
+ }else{
   const st=pts[si],ex=last.al-(st.al+FN[S.sex].p50(last.age)-FN[S.sex].p50(st.age));
   h+=`<div class="ln"><small>治療開始後、標準的な伸びの目安との差：<b>${ex>=0?'+':''}${ex.toFixed(2)}mm</b>（マイナスは目安より短い）</small></div>`;
  }
  return h+'</div>';
 }
 function tableHtml(){
- if(!S.rows.some(r=>isFinite(parseFloat(r.r))||isFinite(parseFloat(r.l))))return'';
  const P={r:points('r'),l:points('l')};
  const rows=S.rows.filter(r=>P.r.some(p=>p.id===r.id)||P.l.some(p=>p.id===r.id));
+ if(!rows.length)return'';
  const cell=(k,r)=>{
   const ps=P[k],i=ps.findIndex(p=>p.id===r.id);
   if(i<0)return'<td>—</td><td>—</td><td>—</td>';
@@ -342,12 +436,13 @@ function tableHtml(){
  };
  return`<table class="rs"><thead><tr><th rowspan="2">測定時の年齢</th><th colspan="3" style="color:var(--r)">右眼</th><th colspan="3" style="color:var(--l)">左眼</th></tr>
  <tr><th>眼軸長(mm)</th><th>%tile</th><th>前回差</th><th>眼軸長(mm)</th><th>%tile</th><th>前回差</th></tr></thead><tbody>`+
- rows.map(r=>`<tr class="${r.id===S.startId?'start':''}"><td>${ageText((+r.y)+(+r.m)/12)}${r.id===S.startId?' <span class="badge" style="background:#e0a000">治療開始</span>':''}</td>${cell('r',r)}${cell('l',r)}</tr>`).join('')+'</tbody></table>';
+ rows.map(r=>`<tr class="${r.id===S.startId?'start':''}"><td>${ageText(rowAge(r))}${r.id===S.startId?' <span class="badge" style="background:#e0a000">治療開始</span>':''}</td>${cell('r',r)}${cell('l',r)}</tr>`).join('')+'</tbody></table>';
 }
 function render(){
  const sexName=S.sex==='m'?'男児':'女児';
  $('shDate').textContent=S.date?S.date.replace(/-/g,'/')+' 作成':'';
- $('info').innerHTML=`<span>お名前：<b>${S.name?esc(S.name)+' さん':'　　　　　'}</b></span><span>性別：${sexName}</span>${S.treat?`<span>治療：${esc(S.treat)}</span>`:''}`;
+ const bd=S.birth?S.birth.replace(/-/g,'/'):'';
+ $('info').innerHTML=`<span>お名前：<b>${S.name?esc(S.name)+' さん':'　　　　　'}</b></span>${S.pid?`<span>ID：${esc(S.pid)}</span>`:''}${bd?`<span>生年月日：${bd}</span>`:''}<span>性別：${sexName}</span>${S.treat?`<span>治療：${esc(S.treat)}</span>`:''}`;
  $('chart').innerHTML=drawChart();
  $('legend').innerHTML=`<span><i style="border-color:#1f5fbf"></i>右眼（●）</span><span><i style="border-color:#e07b00"></i>左眼（■）</span>
   <span><i style="border-top-style:dotted;border-color:#888"></i>標準的な伸びの目安</span>
@@ -356,6 +451,7 @@ function render(){
  $('tbl').innerHTML=tableHtml();
 }
 syncFields();renderEditor();render();
+if(S.pid)setStatus('ID '+S.pid+' を表示中（この端末の下書き）。最新を読み込むには「呼び出し」を押してください');
 </script>
 </body>
 </html>
