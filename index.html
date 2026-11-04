@@ -240,6 +240,7 @@ async function saveNow(){
   setStatus('先にIDを入力して「検索」を押してください（新しいIDなら新規登録になります）','err');
   return;
  }
+ sortRowsDom();
  saving=true;setStatus('保存中…');
  try{
   const r=await api('PUT',{id:S.pid,baseRev:S.rev,record:record()});
@@ -269,6 +270,7 @@ async function loadPatient(){
    S=Object.assign(blank(),r.record,{pid:id,date:today()});
    setStatus('✓ ID '+id+' を読み込みました。変更したら「保存」を押してください','ok');
   }
+  S.rows.sort(byYm);
   $('pid').value=id;persist();syncFields();renderEditor();render();
  }catch(e){setStatus('⚠ 検索できませんでした：'+e.message,'err')}
 }
@@ -277,11 +279,21 @@ $('pid').addEventListener('keydown',e=>{if(e.key==='Enter')loadPatient()});
 
 /* ---------- editor ---------- */
 const changed=()=>{persist();render();markDirty()};
+const rowComplete=r=>isFinite(ymIdx(r.ym))&&String(r.r).trim()!==''&&String(r.l).trim()!=='';
+const byYm=(a,b)=>(ymIdx(a.ym)||1e9)-(ymIdx(b.ym)||1e9);
+function sortRowsDom(){
+ S.rows.sort(byYm);
+ const body=$('rows'),trs=[...body.children],want=S.rows.map(r=>String(r.id));
+ if(trs.length===want.length&&trs.every((t,i)=>t.dataset.id===want[i]))return;
+ const ae=document.activeElement;
+ for(const id of want){const tr=body.querySelector('tr[data-id="'+id+'"]');if(tr)body.appendChild(tr)}
+ if(ae&&ae!==document.activeElement&&body.contains(ae))ae.focus();
+ persist();
+}
 function renderEditor(){
- S.rows.sort((a,b)=>(ymIdx(a.ym)||1e9)-(ymIdx(b.ym)||1e9));
  $('rows').innerHTML=S.rows.map(r=>`<tr data-id="${r.id}">
   <td style="width:30px"><input type="radio" name="start" ${S.startId===r.id?'checked':''}></td>
-  <td style="width:140px"><input type="text" inputmode="numeric" autocomplete="off" data-f="ym" placeholder="2024/04" maxlength="12" value="${esc(ymDisp(r.ym))}"><button class="tb" data-today>本日</button><div class="ag">${esc(ageLabel(r))}</div></td>
+  <td style="width:140px"><input type="text" inputmode="numeric" autocomplete="off" data-f="ym" placeholder="2024/04" maxlength="12" value="${esc(ymDisp(r.ym))}"><button class="tb" data-today tabindex="-1">本日</button><div class="ag">${esc(ageLabel(r))}</div></td>
   <td><input type="number" data-f="r" step="0.01" min="15" max="35" value="${esc(r.r)}"></td>
   <td><input type="number" data-f="l" step="0.01" min="15" max="35" value="${esc(r.l)}"></td>
   <td class="x" style="width:26px"><button data-del title="削除">×</button></td></tr>`).join('');
@@ -297,12 +309,37 @@ $('rows').addEventListener('input',e=>{
 });
 $('rows').addEventListener('change',e=>{
  if(e.target.name==='start'){S.startId=+e.target.closest('tr').dataset.id;changed();return}
- if(e.target.dataset.f==='ym')renderEditor();
+ if(e.target.dataset.f==='ym'){
+  const row=S.rows.find(r=>r.id==e.target.closest('tr').dataset.id);
+  if(row&&row.ym)e.target.value=ymDisp(row.ym);
+ }
+});
+$('rows').addEventListener('focusout',e=>{
+ const tr=e.target.closest('tr');if(!tr)return;
+ setTimeout(()=>{
+  const ae=document.activeElement;
+  if(!tr.isConnected||(tr.contains(ae)&&ae.dataset&&ae.dataset.f))return;
+  const row=S.rows.find(r=>r.id==tr.dataset.id);
+  if(row&&rowComplete(row))sortRowsDom();
+ },0);
+});
+$('rows').addEventListener('keydown',e=>{
+ const f=e.target.dataset&&e.target.dataset.f;
+ if(e.key!=='Enter'||e.isComposing||!f)return;
+ e.preventDefault();
+ const tr=e.target.closest('tr');
+ let next=null;
+ if(f==='ym')next=tr.querySelector('[data-f=r]');
+ else if(f==='r')next=tr.querySelector('[data-f=l]');
+ else{const n=tr.nextElementSibling;next=n&&n.querySelector('[data-f=ym]')}
+ if(next){next.focus();next.select()}else e.target.blur();
 });
 $('rows').addEventListener('click',e=>{
  if(e.target.hasAttribute('data-today')){
   const id=+e.target.closest('tr').dataset.id;
-  S.rows.find(r=>r.id===id).ym=nowYm();renderEditor();changed();return;
+  S.rows.find(r=>r.id===id).ym=nowYm();renderEditor();changed();
+  const rf=document.querySelector('#rows tr[data-id="'+id+'"] [data-f=r]');if(rf)rf.focus();
+  return;
  }
  if(!e.target.hasAttribute('data-del'))return;
  const id=+e.target.closest('tr').dataset.id;
@@ -456,7 +493,7 @@ function eyeCard(e){
 }
 function tableHtml(){
  const P={r:points('r'),l:points('l')};
- const rows=S.rows.filter(r=>P.r.some(p=>p.id===r.id)||P.l.some(p=>p.id===r.id));
+ const rows=[...S.rows].sort(byYm).filter(r=>P.r.some(p=>p.id===r.id)||P.l.some(p=>p.id===r.id));
  if(!rows.length)return'';
  const cell=(k,r)=>{
   const ps=P[k],i=ps.findIndex(p=>p.id===r.id);
