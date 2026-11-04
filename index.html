@@ -31,7 +31,10 @@ button.pri:hover{background:#0958a8}
 table.ed{width:100%;border-collapse:collapse;font-size:13px}
 table.ed th{font-weight:500;color:var(--mute);font-size:11px;text-align:center;padding:2px}
 table.ed td{padding:2px;text-align:center;vertical-align:top}
-table.ed input[type=number],table.ed input[type=month]{width:100%;padding:4px 3px;text-align:center}
+table.ed input[type=number],table.ed input[type=text]{width:100%;padding:4px 3px;text-align:center}
+table.ed .tb{padding:1px 8px;font-size:11px;margin-top:2px}
+.savebtn{width:100%;font-size:16px;padding:9px}
+.status.dirty{color:#b57f00;font-weight:700}
 table.ed .ag{font-size:11px;color:var(--mute);margin-top:1px}
 table.ed td.x button{padding:2px 7px;color:#999}
 .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
@@ -86,9 +89,10 @@ table.rs tr.start td{background:#fff6e0}
 
   <div class="idrow">
    <input id="pid" inputmode="latin" autocomplete="off" placeholder="ID（カルテ番号）">
-   <button class="pri" id="load">呼び出し</button>
+   <button class="pri" id="load">検索</button>
   </div>
-  <div class="status" id="status">IDを入力して「呼び出し」を押してください（新しいIDなら新規登録になります）</div>
+  <div class="status" id="status">IDを入力して「検索」を押してください（新しいIDなら新規登録になります）</div>
+  <button class="pri savebtn" data-save>保存</button>
 
   <label class="f">患者さん名<input id="name" placeholder="例）山田 太郎"></label>
   <label class="f">生年月日<input id="birth" type="date"></label>
@@ -101,16 +105,17 @@ table.rs tr.start td{background:#fff6e0}
 
   <h3>測定データ（測定した年月を入れると年齢は自動計算）</h3>
   <table class="ed">
-   <thead><tr><th>開始</th><th>測定年月</th><th style="color:var(--r)">右 (mm)</th><th style="color:var(--l)">左 (mm)</th><th></th></tr></thead>
+   <thead><tr><th>開始</th><th>測定年月（記入）</th><th style="color:var(--r)">右 (mm)</th><th style="color:var(--l)">左 (mm)</th><th></th></tr></thead>
    <tbody id="rows"></tbody>
   </table>
   <div class="btns">
    <button id="add">＋ 測定を追加</button>
    <button id="clearStart">治療開始を解除</button>
   </div>
-  <div class="hint">「開始」の○＝その測定から治療開始。入力内容はIDを呼び出し済みなら自動で保存されます。年齢は誕生月からの経過月数で計算します。</div>
+  <div class="hint">「開始」の○＝その測定から治療開始。入力後は「保存」ボタンを押すと保存されます（押すまで保存されません）。年齢は誕生月からの経過月数で計算します。</div>
 
   <div class="btns" style="margin-top:16px">
+   <button class="pri" data-save>保存</button>
    <button class="pri" id="show">画面で見せる</button>
    <button class="pri" id="print">A4で印刷</button>
    <button id="sample">サンプル</button>
@@ -193,10 +198,17 @@ function points(k){
  return S.rows.map(r=>({id:r.id,age:rowAge(r),al:parseFloat(r[k])}))
   .filter(p=>isFinite(p.age)&&p.age>0&&isFinite(p.al)&&p.al>15&&p.al<35).sort((a,b)=>a.age-b.age);
 }
+const ymDisp=ym=>ym?ym.replace('-','/'):'';
+const nowYm=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
+function parseYm(v){
+ const m=/^(\d{4})\D*(\d{1,2})\D*$/.exec(String(v||'').normalize('NFKC').trim());
+ if(!m||+m[2]<1||+m[2]>12)return'';
+ return m[1]+'-'+String(+m[2]).padStart(2,'0');
+}
 const shiftYm=(ym,n)=>{let t=ymIdx(ym);if(!isFinite(t)){const d=new Date();t=d.getFullYear()*12+d.getMonth()-n}t+=n;return Math.floor(t/12)+'-'+String(t%12+1).padStart(2,'0')};
 
 /* ---------- server save / load ---------- */
-let saveTimer=null,saving=false,dirty=false,halted=false;
+let saving=false,dirty=false;
 function setStatus(t,cls){const e=$('status');e.textContent=t;e.className='status'+(cls?' '+cls:'')}
 async function api(method,payload){
  for(let attempt=0;attempt<2;attempt++){
@@ -214,47 +226,46 @@ async function api(method,payload){
 }
 const record=()=>({sex:S.sex,name:S.name,birth:S.birth,treat:S.treat,startId:S.startId,rows:S.rows,next:S.next});
 function markDirty(){
- if(!S.pid){setStatus('IDを入力して「呼び出し」を押すと、以後の入力が自動保存されます');return}
- if(halted)return;
- dirty=true;setStatus('入力中…（自動保存します）');
- clearTimeout(saveTimer);saveTimer=setTimeout(saveNow,900);
+ dirty=true;
+ setStatus(S.pid?'● 未保存の変更があります。「保存」を押してください':'IDを入力して「検索」を押すと保存できます','dirty');
 }
 async function saveNow(){
- clearTimeout(saveTimer);
- if(!S.pid||halted)return;
- if(saving){dirty=true;return}
- saving=true;dirty=false;setStatus('保存中…');
- let failed=false;
+ if(saving)return;
+ if(!S.pid){
+  setStatus('先にIDを入力して「検索」を押してください（新しいIDなら新規登録になります）','err');
+  return;
+ }
+ saving=true;setStatus('保存中…');
  try{
   const r=await api('PUT',{id:S.pid,baseRev:S.rev,record:record()});
-  S.rev=r.rev;persist();
+  S.rev=r.rev;dirty=false;persist();
   setStatus('✓ ID '+S.pid+' を保存しました（'+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'）','ok');
  }catch(e){
-  failed=true;
-  if(e.conflict){halted=true;setStatus('⚠ 別の端末で更新されています。「呼び出し」で最新を読み込んでください（この端末の変更は保存されていません）','err')}
+  if(e.conflict)setStatus('⚠ 別の端末で更新されています。保存できませんでした。「検索」で最新を読み込んでください（この端末の変更は消えます）','err');
   else setStatus('⚠ 保存できませんでした：'+e.message,'err');
  }
  saving=false;
- if(dirty&&!failed)saveNow();
 }
-async function flush(){if(dirty&&S.pid&&!halted)await saveNow()}
+const confirmDiscard=()=>!dirty||confirm('未保存の変更があります。保存せずに続けますか？');
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+document.querySelectorAll('[data-save]').forEach(b=>b.onclick=saveNow);
 async function loadPatient(){
  const id=normId($('pid').value);
  if(!validId(id)){setStatus('IDは英数字（-と_も可）32文字以内で入力してください','err');return}
- await flush();
- setStatus('呼び出し中…');
+ if(!confirmDiscard())return;
+ setStatus('検索中…');
  try{
   const r=await api('GET',id);
-  halted=false;dirty=false;
+  dirty=false;
   if(!r){
    S=Object.assign(blank(),{pid:id,rev:0});
-   setStatus('ID '+id+' は新規です。入力すると自動保存されます');
+   setStatus('ID '+id+' は新規です。入力して「保存」を押してください');
   }else{
    S=Object.assign(blank(),r.record,{pid:id,date:today()});
-   setStatus('✓ ID '+id+' を呼び出しました。変更すると自動保存されます','ok');
+   setStatus('✓ ID '+id+' を読み込みました。変更したら「保存」を押してください','ok');
   }
   $('pid').value=id;persist();syncFields();renderEditor();render();
- }catch(e){setStatus('⚠ 呼び出せませんでした：'+e.message,'err')}
+ }catch(e){setStatus('⚠ 検索できませんでした：'+e.message,'err')}
 }
 $('load').onclick=loadPatient;
 $('pid').addEventListener('keydown',e=>{if(e.key==='Enter')loadPatient()});
@@ -265,15 +276,18 @@ function renderEditor(){
  S.rows.sort((a,b)=>(ymIdx(a.ym)||1e9)-(ymIdx(b.ym)||1e9));
  $('rows').innerHTML=S.rows.map(r=>`<tr data-id="${r.id}">
   <td style="width:30px"><input type="radio" name="start" ${S.startId===r.id?'checked':''}></td>
-  <td style="width:140px"><input type="month" data-f="ym" value="${esc(r.ym)}"><div class="ag">${esc(ageLabel(r))}</div></td>
+  <td style="width:140px"><input type="text" inputmode="numeric" autocomplete="off" data-f="ym" placeholder="2024/04" maxlength="12" value="${esc(ymDisp(r.ym))}"><button class="tb" data-today>本日</button><div class="ag">${esc(ageLabel(r))}</div></td>
   <td><input type="number" data-f="r" step="0.01" min="15" max="35" value="${esc(r.r)}"></td>
   <td><input type="number" data-f="l" step="0.01" min="15" max="35" value="${esc(r.l)}"></td>
   <td class="x" style="width:26px"><button data-del title="削除">×</button></td></tr>`).join('');
 }
 $('rows').addEventListener('input',e=>{
  const tr=e.target.closest('tr');if(!tr||!e.target.dataset.f)return;
- const row=S.rows.find(r=>r.id==tr.dataset.id);row[e.target.dataset.f]=e.target.value;
- if(e.target.dataset.f==='ym')tr.querySelector('.ag').textContent=ageLabel(row);
+ const row=S.rows.find(r=>r.id==tr.dataset.id);
+ if(e.target.dataset.f==='ym'){
+  row.ym=parseYm(e.target.value);
+  tr.querySelector('.ag').textContent=row.ym||!e.target.value.trim()?ageLabel(row):'例）2024/04';
+ }else row[e.target.dataset.f]=e.target.value;
  changed();
 });
 $('rows').addEventListener('change',e=>{
@@ -281,6 +295,10 @@ $('rows').addEventListener('change',e=>{
  if(e.target.dataset.f==='ym')renderEditor();
 });
 $('rows').addEventListener('click',e=>{
+ if(e.target.hasAttribute('data-today')){
+  const id=+e.target.closest('tr').dataset.id;
+  S.rows.find(r=>r.id===id).ym=nowYm();renderEditor();changed();return;
+ }
  if(!e.target.hasAttribute('data-del'))return;
  const id=+e.target.closest('tr').dataset.id;
  S.rows=S.rows.filter(r=>r.id!==id);if(S.startId===id)S.startId=null;
@@ -289,26 +307,26 @@ $('rows').addEventListener('click',e=>{
 });
 $('add').onclick=()=>{
  const last=S.rows[S.rows.length-1];
- S.rows.push({id:S.next++,ym:last&&last.ym?shiftYm(last.ym,6):'',r:'',l:''});
+ S.rows.push({id:S.next++,ym:last&&last.ym?shiftYm(last.ym,6):nowYm(),r:'',l:''});
  renderEditor();changed();
 };
 $('clearStart').onclick=()=>{S.startId=null;renderEditor();changed()};
 document.querySelectorAll('input[name=sex]').forEach(el=>el.onchange=()=>{S.sex=el.value;changed()});
 for(const id of['name','treat','date'])$(id).oninput=()=>{S[id]=$(id).value;changed()};
 $('birth').oninput=()=>{S.birth=$('birth').value;renderEditor();changed()};
-$('sample').onclick=async()=>{
- await flush();
+$('sample').onclick=()=>{
+ if(!confirmDiscard())return;
  S=Object.assign(blank(),{sex:'m',name:'サンプル 太郎',birth:'2014-04-10',treat:'低濃度アトロピン点眼',startId:3,next:20,
   rows:[[1,'2022-04',23.55,23.50],[2,'2022-10',23.85,23.80],[3,'2023-04',24.10,24.02],[4,'2023-10',24.22,24.16],[5,'2024-04',24.33,24.27],[6,'2024-10',24.44,24.38],[7,'2025-04',24.55,24.47]]
    .map(a=>({id:a[0],ym:a[1],r:String(a[2]),l:String(a[3])}))});
- halted=false;dirty=false;persist();syncFields();renderEditor();render();
+ dirty=false;persist();syncFields();renderEditor();render();
  setStatus('サンプル表示中（保存されません）');
 };
-$('reset').onclick=async()=>{
+$('reset').onclick=()=>{
+ if(!confirmDiscard())return;
  if(!confirm('画面の入力をクリアして新しい患者さんの入力にします。\n（保存済みのデータは消えません）'))return;
- await flush();
- S=blank();halted=false;dirty=false;persist();syncFields();renderEditor();render();
- setStatus('IDを入力して「呼び出し」を押してください（新しいIDなら新規登録になります）');
+ S=blank();dirty=false;persist();syncFields();renderEditor();render();
+ setStatus('IDを入力して「検索」を押してください（新しいIDなら新規登録になります）');
 };
 function syncFields(){
  document.querySelector('input[name=sex][value='+S.sex+']').checked=true;
@@ -451,7 +469,7 @@ function render(){
  $('tbl').innerHTML=tableHtml();
 }
 syncFields();renderEditor();render();
-if(S.pid)setStatus('ID '+S.pid+' を表示中（この端末の下書き）。最新を読み込むには「呼び出し」を押してください');
+if(S.pid)setStatus('ID '+S.pid+' を表示中（この端末の下書き）。最新を読み込むには「検索」を押してください');
 </script>
 </body>
 </html>
