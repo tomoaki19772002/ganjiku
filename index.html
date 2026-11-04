@@ -119,7 +119,7 @@ table.rs tr.start td{background:#fff6e0}
    <button class="pri" id="show">画面で見せる</button>
    <button class="pri" id="print">A4で印刷</button>
    <button id="sample">サンプル</button>
-   <button id="reset">新規／クリア</button>
+   <button id="reset">クリア</button>
   </div>
  </aside>
 
@@ -332,7 +332,6 @@ $('sample').onclick=()=>{
 };
 $('reset').onclick=()=>{
  if(!confirmDiscard())return;
- if(!confirm('画面の入力をクリアして新しい患者さんの入力にします。\n（保存済みのデータは消えません）'))return;
  S=blank();dirty=false;persist();syncFields();renderEditor();render();
  setStatus('IDを入力して「検索」を押してください（新しいIDなら新規登録になります）');
 };
