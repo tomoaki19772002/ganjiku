@@ -136,7 +136,7 @@ table.rs tr.start td{background:#fff6e0}
    <div class="legend" id="legend"></div>
    <div class="cards" id="cards"></div>
    <div id="tbl"></div>
-   <div class="note">※ 背景の帯は日本人小児の眼軸長パーセンタイル成長曲線（10〜90パーセンタイル）です。「標準的な伸びの目安」は、治療開始時（なければ初回）の眼軸長から、標準（50パーセンタイル）と同じ速さで伸びた場合の線です。パーセンタイルは曲線からの推定値です。眼軸長には測定ごとに±0.05〜0.1mm程度の誤差があるため、半年以上の経過で判断します。治療効果の最終的な判定は診察で総合的に行います。</div>
+   <div class="note">※ 背景の帯は日本人小児の眼軸長パーセンタイル成長曲線（10〜90パーセンタイル）です。「標準的な伸びの目安」は、治療開始時（なければ初回）の眼軸長から、標準（50パーセンタイル）と同じ速さで伸びた場合の線です。眼軸長には測定ごとに±0.05〜0.1mm程度の誤差があるため、半年以上の経過で判断します。治療効果の最終的な判定は診察で総合的に行います。</div>
   </section>
  </main>
 </div>
@@ -460,12 +460,12 @@ function tableHtml(){
  if(!rows.length)return'';
  const cell=(k,r)=>{
   const ps=P[k],i=ps.findIndex(p=>p.id===r.id);
-  if(i<0)return'<td>—</td><td>—</td><td>—</td>';
-  const p=ps[i],pc=pct(p.age,p.al),dl=i?p.al-ps[i-1].al:null;
-  return`<td><b>${p.al.toFixed(2)}</b></td><td>${pc==null?'—':'約'+pc}</td><td>${dl==null?'—':(dl>=0?'+':'')+dl.toFixed(2)}</td>`;
+  if(i<0)return'<td>—</td><td>—</td>';
+  const p=ps[i],dl=i?p.al-ps[i-1].al:null;
+  return`<td><b>${p.al.toFixed(2)}</b></td><td>${dl==null?'—':(dl>=0?'+':'')+dl.toFixed(2)}</td>`;
  };
- return`<table class="rs"><thead><tr><th rowspan="2">測定時の年齢</th><th colspan="3" style="color:var(--r)">右眼</th><th colspan="3" style="color:var(--l)">左眼</th></tr>
- <tr><th>眼軸長(mm)</th><th>%tile</th><th>前回差</th><th>眼軸長(mm)</th><th>%tile</th><th>前回差</th></tr></thead><tbody>`+
+ return`<table class="rs"><thead><tr><th rowspan="2">測定時の年齢</th><th colspan="2" style="color:var(--r)">右眼</th><th colspan="2" style="color:var(--l)">左眼</th></tr>
+ <tr><th>眼軸長(mm)</th><th>前回差</th><th>眼軸長(mm)</th><th>前回差</th></tr></thead><tbody>`+
  rows.map(r=>`<tr class="${r.id===S.startId?'start':''}"><td>${ageText(rowAge(r))}${r.id===S.startId?' <span class="badge" style="background:#e0a000">治療開始</span>':''}</td>${cell('r',r)}${cell('l',r)}</tr>`).join('')+'</tbody></table>';
 }
 function render(){
