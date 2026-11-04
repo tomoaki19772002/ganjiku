@@ -49,6 +49,8 @@ body.present .present-bar{display:flex}
 .sh-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--accent);padding-bottom:6px;margin-bottom:8px}
 .sh-head h1{font-size:20px;margin:0}
 .sh-head .cl{font-size:12px;color:var(--mute)}
+.sh-head .hr{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.logo{height:10mm;width:auto;display:block}
 .info{display:flex;flex-wrap:wrap;gap:4px 22px;font-size:13px;margin-bottom:6px}
 .info b{font-size:15px}
 .chart svg{width:100%;height:auto;display:block}
@@ -77,7 +79,10 @@ table.rs tr.start td{background:#fff6e0}
  .app{display:block;padding:0}
  .sheetwrap{display:block}
  .sheet,body.present .sheet{width:210mm;height:296mm;overflow:hidden;padding:11mm 12mm;box-shadow:none;border-radius:0;margin:0}
+ .sheet,body.present .sheet{padding:8mm 12mm}
+ .chart svg{height:104mm}
  .cards{grid-template-columns:1fr 1fr!important}
+ table.rs th,table.rs td{padding:2px 5px}
  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 </style>
@@ -125,7 +130,7 @@ table.rs tr.start td{background:#fff6e0}
 
  <main class="sheetwrap">
   <section class="sheet" id="sheet">
-   <div class="sh-head"><h1>眼軸長 経過レポート</h1><div class="cl" id="shDate"></div></div>
+   <div class="sh-head"><h1>眼軸長 経過レポート</h1><div class="hr"><img class="logo" src="logo.png" alt="川越あさひ眼科"><div class="cl" id="shDate"></div></div></div>
    <div class="info" id="info"></div>
    <div class="chart" id="chart"></div>
    <div class="legend" id="legend"></div>
