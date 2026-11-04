@@ -95,7 +95,7 @@ table.rs tr.start td{background:#fff6e0}
   <button class="pri savebtn" data-save>保存</button>
 
   <label class="f">患者さん名<input id="name" placeholder="例）山田 太郎"></label>
-  <label class="f">生年月日<input id="birth" type="date"></label>
+  <label class="f">生年月日（記入：例 2014/04/10）<input id="birth" type="text" inputmode="numeric" autocomplete="off" placeholder="2014/04/10" maxlength="14"></label>
   <div class="seg">
    <label><input type="radio" name="sex" value="m">男児</label>
    <label><input type="radio" name="sex" value="f">女児</label>
@@ -313,7 +313,15 @@ $('add').onclick=()=>{
 $('clearStart').onclick=()=>{S.startId=null;renderEditor();changed()};
 document.querySelectorAll('input[name=sex]').forEach(el=>el.onchange=()=>{S.sex=el.value;changed()});
 for(const id of['name','treat','date'])$(id).oninput=()=>{S[id]=$(id).value;changed()};
-$('birth').oninput=()=>{S.birth=$('birth').value;renderEditor();changed()};
+function parseYmd(v){
+ const m=/^(\d{4})\D*(\d{1,2})\D*(\d{1,2})\D*$/.exec(String(v||'').normalize('NFKC').trim());
+ if(!m)return'';
+ const y=+m[1],mo=+m[2],d=+m[3],t=new Date(y,mo-1,d);
+ if(t.getFullYear()!==y||t.getMonth()!==mo-1||t.getDate()!==d)return'';
+ return m[1]+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
+$('birth').oninput=()=>{S.birth=parseYmd($('birth').value);renderEditor();changed()};
+$('birth').onchange=()=>{$('birth').value=S.birth.replace(/-/g,'/')};
 $('sample').onclick=()=>{
  if(!confirmDiscard())return;
  S=Object.assign(blank(),{sex:'m',name:'サンプル 太郎',birth:'2014-04-10',treat:'低濃度アトロピン点眼',startId:3,next:20,
@@ -330,7 +338,7 @@ $('reset').onclick=()=>{
 };
 function syncFields(){
  document.querySelector('input[name=sex][value='+S.sex+']').checked=true;
- $('pid').value=S.pid;$('name').value=S.name;$('birth').value=S.birth;$('treat').value=S.treat;$('date').value=S.date;
+ $('pid').value=S.pid;$('name').value=S.name;$('birth').value=S.birth.replace(/-/g,'/');$('treat').value=S.treat;$('date').value=S.date;
 }
 const setPresent=on=>{document.body.classList.toggle('present',on);window.scrollTo(0,0)};
 $('show').onclick=()=>setPresent(true);
