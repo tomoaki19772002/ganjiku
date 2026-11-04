@@ -33,6 +33,12 @@ table.ed th{font-weight:500;color:var(--mute);font-size:11px;text-align:center;p
 table.ed td{padding:2px;text-align:center;vertical-align:top}
 table.ed input[type=number],table.ed input[type=text]{width:100%;padding:4px 3px;text-align:center}
 table.ed .tb{padding:1px 8px;font-size:11px;margin-top:2px}
+.txsel{display:flex;gap:8px;margin-top:3px}
+.txsel label{flex:1;border:1px solid #c5ced6;border-radius:6px;padding:6px;text-align:center;font-size:14px;color:var(--ink);cursor:pointer}
+.txsel label:has(input:checked){background:#eef5ff;border-color:var(--accent);font-weight:700}
+.chips{margin-top:2px}
+.chip{padding:1px 7px;font-size:11px;margin:2px 2px 0 0;border:1px solid;border-radius:10px;background:#fff}
+.chip.on{color:#fff}
 .savebtn{width:100%;font-size:16px;padding:9px}
 .status.dirty{color:#b57f00;font-weight:700}
 table.ed .ag{font-size:11px;color:var(--mute);margin-top:1px}
@@ -105,19 +111,20 @@ table.rs tr.start td{background:#fff6e0}
    <label><input type="radio" name="sex" value="m">男児</label>
    <label><input type="radio" name="sex" value="f">女児</label>
   </div>
-  <label class="f">治療内容<input id="treat" placeholder="例）低濃度アトロピン点眼 / オルソケラトロジー"></label>
+  <div class="f">治療内容（併用する場合は両方選択）
+   <div class="txsel"><label><input type="checkbox" data-txon="lx">リジュセア</label><label><input type="checkbox" data-txon="gl">近視抑制眼鏡</label></div>
+  </div>
   <label class="f">レポート作成日（保存されません）<input id="date" type="date"></label>
 
   <h3>測定データ（測定した年月を入れると年齢は自動計算）</h3>
   <table class="ed">
-   <thead><tr><th>開始</th><th>測定年月（記入）</th><th style="color:var(--r)">右 (mm)</th><th style="color:var(--l)">左 (mm)</th><th></th></tr></thead>
+   <thead><tr><th>測定年月（記入）</th><th style="color:var(--r)">右 (mm)</th><th style="color:var(--l)">左 (mm)</th><th></th></tr></thead>
    <tbody id="rows"></tbody>
   </table>
   <div class="btns">
    <button id="add">＋ 測定を追加</button>
-   <button id="clearStart">治療開始を解除</button>
   </div>
-  <div class="hint">「開始」の○＝その測定から治療開始。入力後は「保存」ボタンを押すと保存されます（押すまで保存されません）。年齢は誕生月からの経過月数で計算します。</div>
+  <div class="hint">治療を選ぶと、測定行に「リ開始」「リ中止」「眼開始」「眼中止」のボタンが出ます（リ＝リジュセア、眼＝近視抑制眼鏡）。押すとその測定年月が開始・中止になり、もう一度押すと解除されます。入力後は「保存」ボタンを押すと保存されます（押すまで保存されません）。年齢は誕生月からの経過月数で計算します。</div>
 
   <div class="btns" style="margin-top:16px">
    <button class="pri" data-save>保存</button>
@@ -180,10 +187,13 @@ function pct(age,al){
 /* ---------- state ---------- */
 const KEY='ganjiku_v2',KEYPASS='ganjiku_pass';
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
-const blank=()=>({sex:'m',name:'',birth:'',treat:'',date:today(),startId:null,rows:[{id:1,ym:'',r:'',l:''}],next:2,pid:'',rev:0});
+const TX=[{k:'lx',name:'リジュセア',short:'リ',col:'#7b3fb0'},{k:'gl',name:'近視抑制眼鏡',short:'眼',col:'#0f8a7a'}];
+const blankTx=()=>({lx:{on:false,start:null,stop:null},gl:{on:false,start:null,stop:null}});
+const normTx=t=>{const o=blankTx();for(const k of['lx','gl']){const s=(t&&t[k])||{};o[k]={on:!!s.on,start:Number.isFinite(s.start)?s.start:null,stop:Number.isFinite(s.stop)?s.stop:null}}return o};
+const blank=()=>({sex:'m',name:'',birth:'',date:today(),tx:blankTx(),rows:[{id:1,ym:'',r:'',l:''}],next:2,pid:'',rev:0});
 let S;
 try{S=Object.assign(blank(),JSON.parse(localStorage.getItem(KEY)))}catch(e){S=blank()}
-S.date=today();
+S.date=today();S.tx=normTx(S.tx);
 const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const getPass=()=>{try{return localStorage.getItem(KEYPASS)||''}catch(e){return''}};
 const setPass=v=>{try{localStorage.setItem(KEYPASS,v)}catch(e){}};
@@ -229,7 +239,7 @@ async function api(method,payload){
   return j;
  }
 }
-const record=()=>({sex:S.sex,name:S.name,birth:S.birth,treat:S.treat,startId:S.startId,rows:S.rows,next:S.next});
+const record=()=>({sex:S.sex,name:S.name,birth:S.birth,tx:S.tx,rows:S.rows,next:S.next});
 function markDirty(){
  dirty=true;
  setStatus(S.pid?'● 未保存の変更があります。「保存」を押してください':'IDを入力して「検索」を押すと保存できます','dirty');
@@ -270,7 +280,7 @@ async function loadPatient(){
    S=Object.assign(blank(),r.record,{pid:id,date:today()});
    setStatus('✓ ID '+id+' を読み込みました。変更したら「保存」を押してください','ok');
   }
-  S.rows.sort(byYm);
+  S.tx=normTx(S.tx);S.rows.sort(byYm);
   $('pid').value=id;persist();syncFields();renderEditor();render();
  }catch(e){setStatus('⚠ 検索できませんでした：'+e.message,'err')}
 }
@@ -290,10 +300,13 @@ function sortRowsDom(){
  if(ae&&ae!==document.activeElement&&body.contains(ae))ae.focus();
  persist();
 }
+const chipsHtml=r=>TX.filter(t=>S.tx[t.k].on).map(t=>[['start','開始'],['stop','中止']].map(([kind,lab])=>{
+ const on=S.tx[t.k][kind]===r.id;
+ return`<button class="chip${on?' on':''}" tabindex="-1" data-chip="${t.k}:${kind}" style="${on?'background:'+t.col+';border-color:'+t.col:'color:'+t.col+';border-color:'+t.col}">${t.short}${lab}</button>`;
+}).join('')).join('');
 function renderEditor(){
  $('rows').innerHTML=S.rows.map(r=>`<tr data-id="${r.id}">
-  <td style="width:30px"><input type="radio" name="start" ${S.startId===r.id?'checked':''}></td>
-  <td style="width:140px"><input type="text" inputmode="numeric" autocomplete="off" data-f="ym" placeholder="2024/04" maxlength="12" value="${esc(ymDisp(r.ym))}"><button class="tb" data-today tabindex="-1">本日</button><div class="ag">${esc(ageLabel(r))}</div></td>
+  <td style="width:140px"><input type="text" inputmode="numeric" autocomplete="off" data-f="ym" placeholder="2024/04" maxlength="12" value="${esc(ymDisp(r.ym))}"><button class="tb" data-today tabindex="-1">本日</button><div class="ag">${esc(ageLabel(r))}</div><div class="chips">${chipsHtml(r)}</div></td>
   <td><input type="number" data-f="r" step="0.01" min="15" max="35" value="${esc(r.r)}"></td>
   <td><input type="number" data-f="l" step="0.01" min="15" max="35" value="${esc(r.l)}"></td>
   <td class="x" style="width:26px"><button data-del title="削除">×</button></td></tr>`).join('');
@@ -308,7 +321,6 @@ $('rows').addEventListener('input',e=>{
  changed();
 });
 $('rows').addEventListener('change',e=>{
- if(e.target.name==='start'){S.startId=+e.target.closest('tr').dataset.id;changed();return}
  if(e.target.dataset.f==='ym'){
   const row=S.rows.find(r=>r.id==e.target.closest('tr').dataset.id);
   if(row&&row.ym)e.target.value=ymDisp(row.ym);
@@ -341,20 +353,27 @@ $('rows').addEventListener('click',e=>{
   const rf=document.querySelector('#rows tr[data-id="'+id+'"] [data-f=r]');if(rf)rf.focus();
   return;
  }
+ const chip=e.target.closest('[data-chip]');
+ if(chip){
+  const id=+chip.closest('tr').dataset.id,[k,kind]=chip.dataset.chip.split(':');
+  S.tx[k][kind]=S.tx[k][kind]===id?null:id;renderEditor();changed();return;
+ }
  if(!e.target.hasAttribute('data-del'))return;
  const id=+e.target.closest('tr').dataset.id;
- S.rows=S.rows.filter(r=>r.id!==id);if(S.startId===id)S.startId=null;
+ S.rows=S.rows.filter(r=>r.id!==id);
+ for(const t of TX)for(const kind of['start','stop'])if(S.tx[t.k][kind]===id)S.tx[t.k][kind]=null;
  if(!S.rows.length)S.rows.push({id:S.next++,ym:'',r:'',l:''});
  renderEditor();changed();
 });
 $('add').onclick=()=>{
- const last=S.rows[S.rows.length-1];
- S.rows.push({id:S.next++,ym:last&&last.ym?shiftYm(last.ym,6):nowYm(),r:'',l:''});
+ const id=S.next++;
+ S.rows.push({id,ym:'',r:'',l:''});
  renderEditor();changed();
+ const f=document.querySelector('#rows tr[data-id="'+id+'"] [data-f=ym]');if(f)f.focus();
 };
-$('clearStart').onclick=()=>{S.startId=null;renderEditor();changed()};
+document.querySelectorAll('[data-txon]').forEach(c=>c.onchange=()=>{S.tx[c.dataset.txon].on=c.checked;renderEditor();changed()});
 document.querySelectorAll('input[name=sex]').forEach(el=>el.onchange=()=>{S.sex=el.value;changed()});
-for(const id of['name','treat','date'])$(id).oninput=()=>{S[id]=$(id).value;changed()};
+for(const id of['name','date'])$(id).oninput=()=>{S[id]=$(id).value;changed()};
 function parseYmd(v){
  const m=/^(\d{4})\D*(\d{1,2})\D*(\d{1,2})\D*$/.exec(String(v||'').normalize('NFKC').trim());
  if(!m)return'';
@@ -366,7 +385,7 @@ $('birth').oninput=()=>{S.birth=parseYmd($('birth').value);renderEditor();change
 $('birth').onchange=()=>{$('birth').value=S.birth.replace(/-/g,'/')};
 $('sample').onclick=()=>{
  if(!confirmDiscard())return;
- S=Object.assign(blank(),{sex:'m',name:'サンプル 太郎',birth:'2014-04-10',treat:'低濃度アトロピン点眼',startId:3,next:20,
+ S=Object.assign(blank(),{sex:'m',name:'サンプル 太郎',birth:'2014-04-10',tx:{lx:{on:true,start:3,stop:null},gl:{on:false,start:null,stop:null}},next:20,
   rows:[[1,'2022-04',23.55,23.50],[2,'2022-10',23.85,23.80],[3,'2023-04',24.10,24.02],[4,'2023-10',24.22,24.16],[5,'2024-04',24.33,24.27],[6,'2024-10',24.44,24.38],[7,'2025-04',24.55,24.47]]
    .map(a=>({id:a[0],ym:a[1],r:String(a[2]),l:String(a[3])}))});
  dirty=false;persist();syncFields();renderEditor();render();
@@ -379,7 +398,7 @@ $('reset').onclick=()=>{
 };
 function syncFields(){
  document.querySelector('input[name=sex][value='+S.sex+']').checked=true;
- $('pid').value=S.pid;$('name').value=S.name;$('birth').value=S.birth.replace(/-/g,'/');$('treat').value=S.treat;$('date').value=S.date;
+ $('pid').value=S.pid;$('name').value=S.name;$('birth').value=S.birth.replace(/-/g,'/');document.querySelectorAll('[data-txon]').forEach(c=>c.checked=!!S.tx[c.dataset.txon].on);$('date').value=S.date;
 }
 const setPresent=on=>{document.body.classList.toggle('present',on);window.scrollTo(0,0)};
 $('show').onclick=()=>setPresent(true);
@@ -392,7 +411,7 @@ function drawChart(){
  const ages=all.map(p=>p.age),als=all.map(p=>p.al);
  const lo=Math.min(6,Math.floor(Math.min(...ages,6))),hi=Math.max(15,Math.ceil(Math.max(...ages,15)));
  const ylo=Math.floor(Math.min(f.p10(6),...als)-0.2),yhi=Math.ceil(Math.max(f.p90(15),...als)+0.2);
- const W=700,H=470,ml=48,mr=44,mt=26,mb=42,pw=W-ml-mr,ph=H-mt-mb;
+ const W=700,H=470,ml=48,mr=44,mt=38,mb=42,pw=W-ml-mr,ph=H-mt-mb;
  const X=a=>ml+(a-lo)/(hi-lo)*pw,Y=v=>mt+(1-(v-ylo)/(yhi-ylo))*ph;
  const path=g=>{let s='';for(let a=6;a<=15.0001;a+=0.1)s+=(s?'L':'M')+X(a).toFixed(1)+' '+Y(g(a)).toFixed(1);return s};
  let o=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Yu Gothic UI,Yu Gothic,Meiryo,sans-serif">`;
@@ -417,17 +436,19 @@ function drawChart(){
  o+=`<path d="${path(f.p50)}" fill="none" stroke="${S.sex==='m'?'#5b8fd0':'#e07aa8'}" stroke-width="2.4"/>`;
  for(const [lab,g,c] of [['90%',f.p90,'#d9615a'],['50%',f.p50,'#445'],['10%',f.p10,'#4fae5a']])
   o+=`<text x="${X(15)+5}" y="${Y(g(15))+4}" font-size="11.5" fill="${c}">${lab}</text>`;
- const sr=S.rows.find(r=>r.id===S.startId);
- if(sr){
-  const sa=rowAge(sr);
-  if(isFinite(sa)&&sa>=lo&&sa<=hi){
-   o+=`<line x1="${X(sa)}" x2="${X(sa)}" y1="${mt}" y2="${mt+ph}" stroke="#e0a000" stroke-width="1.6" stroke-dasharray="5 3"/>`;
-   o+=`<text x="${X(sa)}" y="${mt-8}" font-size="12.5" font-weight="700" text-anchor="middle" fill="#b57f00">▼ 治療開始</text>`;
+ const T=txInfo();
+ T.items.forEach((it,n)=>{
+  const ly=n===0?mt-20:mt-6;
+  for(const [age,lab,dash,mark] of [[it.sa,'開始','5 3','▼'],[it.ea,'中止','2 3','■']]){
+   if(age==null||age<lo||age>hi)continue;
+   const x=X(age);
+   o+=`<line x1="${x}" x2="${x}" y1="${mt}" y2="${mt+ph}" stroke="${it.col}" stroke-width="1.7" stroke-dasharray="${dash}"/>`;
+   o+=`<text x="${Math.min(Math.max(x,ml+48),ml+pw-48)}" y="${ly}" font-size="12" font-weight="700" text-anchor="middle" fill="${it.col}">${mark} ${it.name}${lab}</text>`;
   }
- }
+ });
  for(const e of EYES){
   const pts=points(e.k);if(!pts.length)continue;
-  const st=pts.find(p=>p.id===S.startId)||pts[0];
+  const st=T.first!=null?(pts.find(p=>p.age>=T.first-1e-6)||pts[0]):pts[0];
   const last=pts[pts.length-1];
   if(last.age>st.age){
    let d='';for(let a=st.age;a<last.age+0.0001;a+=0.1){const aa=Math.min(a,last.age);d+=(d?'L':'M')+X(aa).toFixed(1)+' '+Y(st.al+f.p50(aa)-f.p50(st.age)).toFixed(1)}
@@ -466,28 +487,48 @@ function line(label,s){
  const sign=s.d>=0?'+':'';
  return`<div class="ln"><b>${label}</b> <small>${sign}${s.d.toFixed(2)}mm／${s.dt.toFixed(1)}年</small><br>年間 <b>${s.rate.toFixed(2)}</b> mm<small>（標準 ${s.std.toFixed(2)}）</small>${verdict(s)}${s.dt<0.5?' <small>※期間が短く参考値</small>':''}</div>`;
 }
+function txInfo(){
+ const out={items:[],first:null,end:null};
+ for(const t of TX){
+  const s=S.tx[t.k];if(!s.on)continue;
+  const sr=S.rows.find(r=>r.id===s.start),er=S.rows.find(r=>r.id===s.stop);
+  const sa=sr?rowAge(sr):NaN,ea=er?rowAge(er):NaN;
+  out.items.push({...t,sr,er,sa:isFinite(sa)?sa:null,ea:isFinite(ea)&&isFinite(sa)&&ea>sa?ea:null});
+ }
+ const st=out.items.filter(i=>i.sa!=null);
+ if(st.length){
+  out.first=Math.min(...st.map(i=>i.sa));
+  if(st.every(i=>i.ea!=null))out.end=Math.max(...st.map(i=>i.ea));
+ }
+ return out;
+}
+const txText=()=>txInfo().items.map(i=>i.name+(i.sr&&i.sr.ym?'（'+ymDisp(i.sr.ym)+'開始'+(i.ea!=null&&i.er.ym?'・'+ymDisp(i.er.ym)+'中止':'')+'）':'')).join('、');
 function eyeCard(e){
  const pts=points(e.k);
  let h=`<div class="card"><h4><span class="dot" style="background:${e.col}"></span>${e.name}</h4>`;
  if(pts.length<2){return h+`<div class="empty">2回以上の測定で表示されます</div></div>`}
- const first=pts[0],last=pts[pts.length-1],si=pts.findIndex(p=>p.id===S.startId);
- if(si>0&&si<pts.length-1){
-  const b=seg(first,pts[si]),a=seg(pts[si],last);
-  h+=line('治療前',b)+line('治療後',a);
-  if(b.rate>0.05){
-   const red=(1-a.rate/b.rate)*100;
-   h+=`<div class="big" style="color:${red>=0?'var(--ok)':'var(--warn)'}">年間伸長量 ${b.rate.toFixed(2)} → ${a.rate.toFixed(2)} mm（${red>=0?Math.round(red)+'% 減少':Math.round(-red)+'% 増加'}）</div>`;
+ const first=pts[0],last=pts[pts.length-1],T=txInfo(),f50=FN[S.sex].p50;
+ const si=T.first==null?-1:pts.findIndex(p=>p.age>=T.first-1e-6);
+ const gap=(a,b)=>b.al-(a.al+f50(b.age)-f50(a.age));
+ if(si>=0){
+  const ei=T.end==null?-1:pts.findIndex(p=>p.age>=T.end-1e-6);
+  const endI=ei>si?ei:pts.length-1;
+  const b=si>0?seg(first,pts[si]):null,d=endI>si?seg(pts[si],pts[endI]):null,a=ei>si&&ei<pts.length-1?seg(pts[ei],last):null;
+  if(b)h+=line('治療前',b);
+  if(d)h+=line('治療中',d);
+  if(a)h+=line('中止後',a);
+  if(!b)h+=`<div class="empty">治療開始より前の測定がないため、治療前後の比較はできません</div>`;
+  if(!d)h+=`<div class="empty">治療開始後の測定がまだありません</div>`;
+  if(b&&d&&b.rate>0.05){
+   const red=(1-d.rate/b.rate)*100;
+   h+=`<div class="big" style="color:${red>=0?'var(--ok)':'var(--warn)'}">年間伸長量 ${b.rate.toFixed(2)} → ${d.rate.toFixed(2)} mm（${red>=0?Math.round(red)+'% 減少':Math.round(-red)+'% 増加'}）</div>`;
   }
+  if(d){const ex=gap(pts[si],pts[endI]);
+   h+=`<div class="ln"><small>治療中、標準的な伸びの目安との差：<b>${ex>=0?'+':''}${ex.toFixed(2)}mm</b>（マイナスは目安より短い）</small></div>`;}
  }else{
   h+=line('全期間',seg(first,last));
-  if(si===0)h+=`<div class="empty">治療開始より前の測定がないため、治療前後の比較はできません</div>`;
- }
- if(si<=0&&pts.length>1){
-  const exp=last.al-(first.al+FN[S.sex].p50(last.age)-FN[S.sex].p50(first.age));
-  h+=`<div class="ln"><small>標準的な伸びの目安との差：${exp>=0?'+':''}${exp.toFixed(2)}mm</small></div>`;
- }else{
-  const st=pts[si],ex=last.al-(st.al+FN[S.sex].p50(last.age)-FN[S.sex].p50(st.age));
-  h+=`<div class="ln"><small>治療開始後、標準的な伸びの目安との差：<b>${ex>=0?'+':''}${ex.toFixed(2)}mm</b>（マイナスは目安より短い）</small></div>`;
+  const ex=gap(first,last);
+  h+=`<div class="ln"><small>標準的な伸びの目安との差：${ex>=0?'+':''}${ex.toFixed(2)}mm</small></div>`;
  }
  return h+'</div>';
 }
@@ -495,6 +536,7 @@ function tableHtml(){
  const P={r:points('r'),l:points('l')};
  const rows=[...S.rows].sort(byYm).filter(r=>P.r.some(p=>p.id===r.id)||P.l.some(p=>p.id===r.id));
  if(!rows.length)return'';
+ const marks=r=>TX.filter(t=>S.tx[t.k].on).flatMap(t=>[['start','開始'],['stop','中止']].filter(([kind])=>S.tx[t.k][kind]===r.id).map(([kind,lab])=>` <span class="badge" style="background:${t.col}">${t.name}${lab}</span>`)).join('');
  const cell=(k,r)=>{
   const ps=P[k],i=ps.findIndex(p=>p.id===r.id);
   if(i<0)return'<td>—</td><td>—</td>';
@@ -503,13 +545,13 @@ function tableHtml(){
  };
  return`<table class="rs"><thead><tr><th rowspan="2">測定時の年齢</th><th colspan="2" style="color:var(--r)">右眼</th><th colspan="2" style="color:var(--l)">左眼</th></tr>
  <tr><th>眼軸長(mm)</th><th>前回差</th><th>眼軸長(mm)</th><th>前回差</th></tr></thead><tbody>`+
- rows.map(r=>`<tr class="${r.id===S.startId?'start':''}"><td>${ageText(rowAge(r))}${r.id===S.startId?' <span class="badge" style="background:#e0a000">治療開始</span>':''}</td>${cell('r',r)}${cell('l',r)}</tr>`).join('')+'</tbody></table>';
+ rows.map(r=>{const mk=marks(r);return`<tr class="${mk?'start':''}"><td>${ageText(rowAge(r))}${mk}</td>${cell('r',r)}${cell('l',r)}</tr>`}).join('')+'</tbody></table>';
 }
 function render(){
  const sexName=S.sex==='m'?'男児':'女児';
  $('shDate').textContent=S.date?S.date.replace(/-/g,'/')+' 作成':'';
  const bd=S.birth?S.birth.replace(/-/g,'/'):'';
- $('info').innerHTML=`<span>お名前：<b>${S.name?esc(S.name)+' さん':'　　　　　'}</b></span>${S.pid?`<span>ID：${esc(S.pid)}</span>`:''}${bd?`<span>生年月日：${bd}</span>`:''}<span>性別：${sexName}</span>${S.treat?`<span>治療：${esc(S.treat)}</span>`:''}`;
+ $('info').innerHTML=`<span>お名前：<b>${S.name?esc(S.name)+' さん':'　　　　　'}</b></span>${S.pid?`<span>ID：${esc(S.pid)}</span>`:''}${bd?`<span>生年月日：${bd}</span>`:''}<span>性別：${sexName}</span>${txText()?`<span>治療：${esc(txText())}</span>`:''}`;
  $('chart').innerHTML=drawChart();
  $('legend').innerHTML=`<span><i style="border-color:#1f5fbf"></i>右眼（●）</span><span><i style="border-color:#e07b00"></i>左眼（■）</span>
   <span><i style="border-top-style:dotted;border-color:#888"></i>標準的な伸びの目安</span>

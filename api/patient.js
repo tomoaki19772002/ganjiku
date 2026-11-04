@@ -35,13 +35,16 @@ function decrypt(b64) {
 
 const str = (v, n) => String(v == null ? '' : v).slice(0, n);
 function clean(rec) {
+  const tx = (k) => {
+    const s = (rec.tx && rec.tx[k]) || {};
+    return { on: !!s.on, start: Number.isFinite(s.start) ? s.start : null, stop: Number.isFinite(s.stop) ? s.stop : null };
+  };
   const rows = Array.isArray(rec.rows) ? rec.rows.slice(0, 100) : [];
   return {
     sex: rec.sex === 'f' ? 'f' : 'm',
     name: str(rec.name, 60),
     birth: str(rec.birth, 10),
-    treat: str(rec.treat, 100),
-    startId: Number.isFinite(rec.startId) ? rec.startId : null,
+    tx: { lx: tx('lx'), gl: tx('gl') },
     next: Number.isFinite(rec.next) ? rec.next : rows.length + 1,
     rows: rows.map((r) => ({ id: Number(r.id) || 0, ym: str(r.ym, 7), r: str(r.r, 8), l: str(r.l, 8) })),
   };
